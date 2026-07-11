@@ -248,13 +248,14 @@ function withCode(text){
 
 /* ================= curriculum ================= */
 var CURRICULUM = [
+
 { id:"tier1", label:"Tier 1", sub:"Will definitely be asked", color:"#FFCB6B", topics:[
   { id:"async", name:"Async programming", why:"The #1 topic for this role. An agent juggles many concurrent I/O calls — async is how one thread does that without blocking.",
     points:[
       "A coroutine is defined with `async def`. Calling it returns a coroutine object that does nothing until awaited or scheduled on the event loop.",
       "`await` yields control back to the loop while waiting on I/O, letting other coroutines run. One thread, cooperative multitasking.",
       "Async wins for I/O-bound work (API calls, DB queries, network) where you mostly wait. It does NOT speed up CPU-bound work — a busy loop still blocks the loop.",
-      "Threads: OS-scheduled, share memory, held back by the GIL for CPU work but fine for blocking I/O with sync libs. Processes: separate memory, true parallelism, for CPU-bound work.",
+      "Threads: OS-scheduled, share memory, held back by the GIL (Global Interpreter Lock) for CPU work but fine for blocking I/O with sync libs. Processes: separate memory, true parallelism, for CPU-bound work.",
       "`asyncio.gather()` runs awaitables concurrently and returns results in argument order.",
       "The trap: a blocking call (time.sleep, requests.get) inside a coroutine freezes the entire event loop. Use asyncio.sleep, httpx, or asyncio.to_thread."
     ],
@@ -339,57 +340,7 @@ async def gather_context(query: str):
     )                                # total ~= 500ms
     return combine(a, b, c)`},
       {q:"Coroutines vs threads vs processes — when do you reach for each?",
-       a:"Coroutines (asyncio): one thread, cooperative, ideal for lots of concurrent I/O (API/DB calls) — exactly what an agent does. Threads: OS-scheduled, share memory, good for blocking I/O with sync libraries, but the GIL means no speedup for CPU work. Processes: separate memory, real multi-core parallelism, for CPU-bound work."}
-    ]},
-  { id:"gil", name:"The GIL", why:"Explains why threads don't speed up CPU work and why multiprocessing exists — a classic conceptual check.",
-    points:[
-      "The Global Interpreter Lock lets only one thread execute Python bytecode at a time in CPython.",
-      "So multithreading gives no speedup for CPU-bound work — threads take turns, never running Python in parallel.",
-      "Threads DO help for I/O-bound work: a thread releases the GIL while blocked on I/O, so others run.",
-      "For real CPU parallelism use multiprocessing (separate processes, separate interpreters) or native/C libs that release the GIL.",
-      "Worth a mention: CPython 3.13 ships an experimental free-threaded (no-GIL) build, but the GIL is still the default and the interview-relevant model."
-    ],
-    code:[
-      {file:"gil.py", src:
-`import threading, multiprocessing as mp
-
-def cpu_bound(n: int) -> int:
-    return sum(i * i for i in range(n))
-
-N = 10_000_000
-
-# Threads: ~no speedup for CPU work -- the GIL serializes them.
-def with_threads():
-    t = [threading.Thread(target=cpu_bound, args=(N,)) for _ in range(4)]
-    for x in t: x.start()
-    for x in t: x.join()
-
-# Processes: real parallelism across cores.
-def with_processes():
-    with mp.Pool(4) as pool:
-        pool.map(cpu_bound, [N] * 4)`}
-    ],
-    drills:[
-      {q:"A teammate 'parallelized' this CPU-bound work with 4 threads and is surprised it's no faster than one thread. Explain why, and what to use instead.",
-       code:
-`import threading
-
-def crunch(rows):                    # pure CPU work, no I/O
-    return sum(r * r for r in rows)
-
-threads = [threading.Thread(target=crunch, args=(chunk,))
-           for chunk in chunks]      # 4 chunks
-for t in threads: t.start()
-for t in threads: t.join()`,
-       a:"The GIL lets only one thread run Python bytecode at a time, so CPU-bound threads take turns rather than running in parallel — you get concurrency, not parallelism, and near-zero speedup (plus thread overhead). Use processes for separate interpreters across cores, or a C-extension that releases the GIL.",
-       acode:
-`from concurrent.futures import ProcessPoolExecutor
-
-def crunch(rows):
-    return sum(r * r for r in rows)
-
-with ProcessPoolExecutor() as pool:
-    results = list(pool.map(crunch, chunks))   # true parallelism`}
+       a:"Coroutines (asyncio): one thread, cooperative, ideal for lots of concurrent I/O (API/DB calls) — exactly what an agent does. Threads: OS-scheduled, share memory, good for blocking I/O with sync libraries, but the Global Interpreter Lock (GIL) means no speedup for CPU work. Processes: separate memory, real multi-core parallelism, for CPU-bound work."}
     ]},
   { id:"fastapi", name:"FastAPI + Pydantic", why:"The web framework for the role. Pydantic models are also how you define tool/function schemas for LLMs and how you parse structured output back.",
     points:[
@@ -459,6 +410,70 @@ class GetWeather(BaseModel):
 
 args = GetWeather.model_validate_json(raw)   # raises on 'kelvin'
 temp = get_weather(args.city, args.unit)`}
+    ]},
+  { id:"decorators", name:"Decorators", why:"The classic 'do you really know Python' test. They'll ask you to write a timing or retry decorator live.",
+    points:[
+      "A decorator is a callable that takes a function and returns a (usually wrapping) function.",
+      "@functools.wraps preserves the wrapped function's name, docstring, and signature metadata.",
+      "A decorator that takes arguments is one more layer: a factory that returns a decorator."
+    ],
+    code:[
+      {file:"decorators.py", src:
+`import functools, time
+
+def timed(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            print(f"{fn.__name__}: {time.perf_counter()-start:.3f}s")
+    return wrapper`}
+    ],
+    drills:[
+      {q:"Write a retry decorator: retry the wrapped function up to `attempts` times with exponential backoff, re-raising if all attempts fail. It must work as decorated below.",
+       code:
+`@retry(attempts=3, base_delay=0.5)
+def fetch_config():
+    return httpx.get("https://config.svc/app").json()`,
+       a:"A decorator that takes arguments is a factory — three layers: factory(args) returns the decorator, which wraps the function. Loop attempts times; re-raise on the last failure; sleep base_delay * 2**i between tries. Use @functools.wraps so the function keeps its name/docstring, and in real code catch specific exceptions rather than bare Exception.",
+       acode:
+`import functools, time
+
+def retry(attempts=3, base_delay=0.5):
+    def deco(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            for i in range(attempts):
+                try:
+                    return fn(*args, **kwargs)
+                except Exception:
+                    if i == attempts - 1:
+                        raise
+                    time.sleep(base_delay * 2 ** i)
+        return wrapper
+    return deco`},
+      {q:"After adding this decorator, help(flaky) shows the name 'wrapper' and the docstring is gone. Why, and what's the one-line fix?",
+       code:
+`def timed(fn):
+    def wrapper(*args, **kwargs):
+        return fn(*args, **kwargs)
+    return wrapper
+
+@timed
+def flaky():
+    "Does a flaky thing."
+    ...`,
+       a:"The decorator replaced flaky with the inner wrapper function, so introspection now sees wrapper's name and its (missing) docstring. Fix: decorate wrapper with @functools.wraps(fn), which copies __name__, __doc__, and the signature from the real function onto the wrapper.",
+       acode:
+`import functools
+
+def timed(fn):
+    @functools.wraps(fn)        # <- the fix
+    def wrapper(*args, **kwargs):
+        return fn(*args, **kwargs)
+    return wrapper`}
     ]},
   { id:"errors", name:"Error handling & reliability", why:"Platform code lives or dies on how it handles the external calls that fail. Reliability questions land here.",
     points:[
@@ -571,6 +586,204 @@ class acquire:
         self.lock.release()     # always runs`}
     ]}
 ]},
+
+{ id:"ai", label:"AI-specific", sub:"Core for this role — know these cold", color:"#C792EA", topics:[
+  { id:"sdk", name:"Calling the SDK & tool calls", why:"Calling the model and handling tool calls is the core of this role. Expect to walk through the messages format, how tools are defined, and how you parse a tool call and feed the result back.",
+    points:[
+      "messages is a list of {role, content}: a system prompt (instructions), user turns, and assistant turns. The whole conversation is resent on every call — the API itself is stateless.",
+      "A tool/function is declared with a name, a description, and a JSON schema for its arguments (generate that schema from a Pydantic model). The model picks one and returns arguments for it.",
+      "The model returns either a normal answer or a request to call a tool. You detect that (Anthropic: stop_reason == 'tool_use'; OpenAI: finish_reason == 'tool_calls'), run the function yourself, and append the result as a new message.",
+      "Parsing is the risky part: validate the tool arguments with Pydantic before calling your function — the model can emit malformed or out-of-range JSON.",
+      "Then you loop: append the tool result and call again, until the model returns a final answer. That loop is the agent — the next topic."
+    ],
+    code:[
+      {file:"1_messages_and_tools.py", src:
+`from anthropic import AsyncAnthropic
+client = AsyncAnthropic()
+
+# a tool = name + description + JSON schema for its arguments
+tools = [{
+    "name": "get_weather",
+    "description": "Get the current weather for a city.",
+    "input_schema": GetWeather.model_json_schema(),   # from Pydantic
+}]
+
+messages = [
+    {"role": "user", "content": "What's the weather in Dubai?"},
+]
+
+resp = await client.messages.create(
+    model="<model-name>", max_tokens=1024,
+    system="You are a helpful assistant.",   # system prompt
+    messages=messages,
+    tools=tools,
+)`},
+      {file:"2_parse_the_tool_call.py", src:
+`# the model wants a tool -> handle it, then call again
+if resp.stop_reason == "tool_use":
+    # 1) record what the model said (its tool request)
+    messages.append({"role": "assistant", "content": resp.content})
+
+    # 2) run each requested tool
+    results = []
+    for block in resp.content:
+        if block.type == "tool_use":
+            args = GetWeather.model_validate(block.input)   # validate!
+            output = get_weather(args.city, args.unit)
+            results.append({
+                "type": "tool_result",
+                "tool_use_id": block.id,        # echo the id back
+                "content": str(output),
+            })
+
+    # 3) feed results back as the next turn, then loop
+    messages.append({"role": "user", "content": results})`},
+      {file:"3_openai_style.py", src:
+`# OpenAI SDK: same idea, different field names
+tools = [{
+    "type": "function",
+    "function": {
+        "name": "get_weather",
+        "description": "Get the current weather for a city.",
+        "parameters": GetWeather.model_json_schema(),
+    },
+}]
+
+resp = await client.chat.completions.create(
+    model="<model-name>", messages=messages, tools=tools,
+)
+msg = resp.choices[0].message
+if msg.tool_calls:                          # finish_reason == "tool_calls"
+    for call in msg.tool_calls:
+        args = GetWeather.model_validate_json(call.function.arguments)
+        output = get_weather(args.city, args.unit)
+        messages.append({                   # role 'tool', echo the id
+            "role": "tool",
+            "tool_call_id": call.id,
+            "content": str(output),
+        })`}
+    ],
+    drills:[
+      {q:"Name the message roles you send to a chat model, and what each one is for.",
+       a:"system: standing instructions / persona. user: the human's input — and, inside a tool loop, the tool_result you feed back. assistant: the model's replies, including its tool-call requests. tool (OpenAI) or a tool_result block (Anthropic): the output of a function you ran, tied to the call's id. The whole list is resent on every call; the API keeps no state of its own."},
+      {q:"The model responded asking to call a tool. Write the steps to handle it before calling the model again.",
+       code:
+`resp = await client.messages.create(model=M, messages=messages, tools=tools)
+# resp.stop_reason == "tool_use"
+# resp.content is a list of blocks (text and/or tool_use)`,
+       a:"(1) Append the assistant message (the tool request) so the model keeps context. (2) For each tool_use block, validate its input with Pydantic and run your function. (3) Append the output as a tool_result carrying the SAME tool_use_id, then call the model again. Repeat until stop_reason is no longer 'tool_use'.",
+       acode:
+`messages.append({"role": "assistant", "content": resp.content})
+
+results = []
+for b in resp.content:
+    if b.type == "tool_use":
+        out = tool_impls[b.name](**b.input)          # run the function
+        results.append({"type": "tool_result",
+                        "tool_use_id": b.id, "content": str(out)})
+
+messages.append({"role": "user", "content": results})
+# ...then loop: await client.messages.create(...) again`}
+    ]},
+  { id:"agentloop", name:"The agent loop", why:"The single most likely 'sketch this on the whiteboard' request. Be able to write it in ~20 lines from memory.",
+    points:[
+      "The pattern: send prompt, model returns tool call, execute the function, feed the result back, repeat until a final answer.",
+      "Always bound the loop with a max-iterations guard so a misbehaving model can't spin forever.",
+      "Append both the assistant's message and the tool results to messages so the model has the full history each turn."
+    ],
+    code:[
+      {file:"agent_loop.py", src:
+`async def agent(client, tools, user_msg, max_steps=10):
+    messages = [{"role": "user", "content": user_msg}]
+
+    for _ in range(max_steps):                  # always bound the loop
+        resp = await client.messages.create(
+            model="<model>", max_tokens=1024,
+            messages=messages, tools=tool_schemas(tools),
+        )
+        messages.append({"role": "assistant", "content": resp.content})
+
+        if resp.stop_reason != "tool_use":       # final answer -> done
+            return resp.text
+
+        results = []
+        for block in resp.tool_use_blocks():     # run each requested tool
+            out = await tools[block.name](**block.input)
+            results.append({
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": str(out),
+            })
+        messages.append({"role": "user", "content": results})  # feed back
+
+    raise RuntimeError("agent exceeded max steps")`}
+    ],
+    drills:[
+      {q:"Sketch the full agent tool-calling loop from scratch (~20 lines). What two things must it ALWAYS have?",
+       code:
+`# the shape they want on the whiteboard:
+#   send messages + tools  ->  model replies
+#   if tool call: run tool, feed result back, repeat
+#   else: return final answer`,
+       a:"It must (1) append both the assistant message and the tool results every turn, so the model keeps full context, and (2) be bounded by a max-steps guard so a misbehaving model can't loop forever. Everything else is the branch on stop_reason.",
+       acode:
+`async def agent(client, tools, user_msg, max_steps=10):
+    messages = [{"role": "user", "content": user_msg}]
+    for _ in range(max_steps):                 # (2) bounded
+        resp = await client.messages.create(
+            model=M, max_tokens=1024,
+            messages=messages, tools=schemas(tools))
+        messages.append({"role": "assistant", "content": resp.content})
+        if resp.stop_reason != "tool_use":
+            return resp.text                    # final answer
+        results = []
+        for b in resp.tool_use_blocks():
+            out = await tools[b.name](**b.input)
+            results.append({"type": "tool_result",
+                            "tool_use_id": b.id, "content": str(out)})
+        messages.append({"role": "user", "content": results})  # (1) feed back
+    raise RuntimeError("exceeded max steps")`}
+    ]},
+  { id:"streaming", name:"Streaming responses", why:"Async generator + SSE through FastAPI — the delivery mechanism for a chat UI.",
+    points:[
+      "Stream tokens as they arrive via an async generator that yields each chunk.",
+      "Return it from FastAPI with StreamingResponse and media type text/event-stream (SSE).",
+      "Each chunk is a data: ... frame separated by a blank line; finish with a sentinel like [DONE]."
+    ],
+    code:[
+      {file:"stream_sse.py", src:
+`from fastapi.responses import StreamingResponse
+
+async def token_stream(prompt: str):
+    async with client.messages.stream(prompt=prompt) as stream:
+        async for text in stream.text_stream:
+            yield f"data: {text}\\n\\n"           # SSE frame
+    yield "data: [DONE]\\n\\n"`}
+    ],
+    drills:[
+      {q:"Users complain they stare at a spinner for 10s before seeing anything. Turn this blocking endpoint into one that streams tokens to the browser as they're generated.",
+       code:
+`@app.post("/chat")
+async def chat(prompt: str):
+    text = await client.complete(prompt)   # waits for the FULL answer
+    return {"text": text}                  # then returns all at once`,
+       a:"Stream instead of buffering: an async generator yields each token as it arrives, returned via StreamingResponse with media_type text/event-stream (SSE). Each chunk is a 'data: ...' frame ending in a blank line, closed with a [DONE] sentinel. The browser renders tokens live, so time-to-first-token drops from 10s to ~instant.",
+       acode:
+`from fastapi.responses import StreamingResponse
+
+async def gen(prompt):
+    async with client.stream(prompt) as s:
+        async for tok in s.text_stream:
+            yield f"data: {tok}\\n\\n"
+    yield "data: [DONE]\\n\\n"
+
+@app.post("/chat")
+async def chat(prompt: str):
+    return StreamingResponse(gen(prompt),
+                             media_type="text/event-stream")`}
+    ]}
+]},
+
 { id:"tier2", label:"Tier 2", sub:"Very likely — be conversational", color:"#7FDBCA", topics:[
   { id:"types", name:"Type hints", why:"Modern AI codebases are fully typed. Expect casual questions on Optional / Union / generics.",
     points:[
@@ -608,70 +821,6 @@ def coerce(x: Union[int, str]) -> int:
 
 def coerce(x: int | str) -> int:
     ...`}
-    ]},
-  { id:"decorators", name:"Decorators", why:"The classic 'do you really know Python' test. They'll ask you to write a timing or retry decorator live.",
-    points:[
-      "A decorator is a callable that takes a function and returns a (usually wrapping) function.",
-      "@functools.wraps preserves the wrapped function's name, docstring, and signature metadata.",
-      "A decorator that takes arguments is one more layer: a factory that returns a decorator."
-    ],
-    code:[
-      {file:"decorators.py", src:
-`import functools, time
-
-def timed(fn):
-    @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
-        start = time.perf_counter()
-        try:
-            return fn(*args, **kwargs)
-        finally:
-            print(f"{fn.__name__}: {time.perf_counter()-start:.3f}s")
-    return wrapper`}
-    ],
-    drills:[
-      {q:"Write a retry decorator: retry the wrapped function up to `attempts` times with exponential backoff, re-raising if all attempts fail. It must work as decorated below.",
-       code:
-`@retry(attempts=3, base_delay=0.5)
-def fetch_config():
-    return httpx.get("https://config.svc/app").json()`,
-       a:"A decorator that takes arguments is a factory — three layers: factory(args) returns the decorator, which wraps the function. Loop attempts times; re-raise on the last failure; sleep base_delay * 2**i between tries. Use @functools.wraps so the function keeps its name/docstring, and in real code catch specific exceptions rather than bare Exception.",
-       acode:
-`import functools, time
-
-def retry(attempts=3, base_delay=0.5):
-    def deco(fn):
-        @functools.wraps(fn)
-        def wrapper(*args, **kwargs):
-            for i in range(attempts):
-                try:
-                    return fn(*args, **kwargs)
-                except Exception:
-                    if i == attempts - 1:
-                        raise
-                    time.sleep(base_delay * 2 ** i)
-        return wrapper
-    return deco`},
-      {q:"After adding this decorator, help(flaky) shows the name 'wrapper' and the docstring is gone. Why, and what's the one-line fix?",
-       code:
-`def timed(fn):
-    def wrapper(*args, **kwargs):
-        return fn(*args, **kwargs)
-    return wrapper
-
-@timed
-def flaky():
-    "Does a flaky thing."
-    ...`,
-       a:"The decorator replaced flaky with the inner wrapper function, so introspection now sees wrapper's name and its (missing) docstring. Fix: decorate wrapper with @functools.wraps(fn), which copies __name__, __doc__, and the signature from the real function onto the wrapper.",
-       acode:
-`import functools
-
-def timed(fn):
-    @functools.wraps(fn)        # <- the fix
-    def wrapper(*args, **kwargs):
-        return fn(*args, **kwargs)
-    return wrapper`}
     ]},
   { id:"generators", name:"Generators & iterators", why:"Streaming LLM responses is literally a generator pattern — and the memory-efficiency question.",
     points:[
@@ -785,6 +934,56 @@ body = json.dumps(record)     # TypeError: not JSON serializable`,
 
 body = json.dumps(record, default=default)`}
     ]},
+  { id:"gil", name:"Global Interpreter Lock (GIL)", why:"A common concept question: why doesn't adding threads make CPU-heavy Python run faster? The Global Interpreter Lock — the GIL — is the reason, and it's why multiprocessing exists.",
+    points:[
+      "The Global Interpreter Lock (GIL) is a lock inside standard Python (CPython) that lets only one thread run Python code at a time — picture a single 'talking stick' the threads must take turns holding.",
+      "So multithreading gives no speedup for CPU-bound work — threads take turns, never running Python in parallel.",
+      "Threads DO help for I/O-bound work: a thread releases the lock while it's waiting on I/O, so others get a turn.",
+      "For real CPU parallelism use multiprocessing (separate processes, each with its own interpreter and its own lock) or native/C libraries that release the lock.",
+      "Worth a mention: recent CPython (3.13+) ships an experimental 'free-threaded' build that removes this lock, but it's still the default everywhere and the version interviewers mean."
+    ],
+    code:[
+      {file:"gil.py", src:
+`import threading, multiprocessing as mp
+
+def cpu_bound(n: int) -> int:
+    return sum(i * i for i in range(n))
+
+N = 10_000_000
+
+# Threads: ~no speedup for CPU work -- only one runs Python at a time.
+def with_threads():
+    t = [threading.Thread(target=cpu_bound, args=(N,)) for _ in range(4)]
+    for x in t: x.start()
+    for x in t: x.join()
+
+# Processes: real parallelism across cores.
+def with_processes():
+    with mp.Pool(4) as pool:
+        pool.map(cpu_bound, [N] * 4)`}
+    ],
+    drills:[
+      {q:"A teammate 'parallelized' this CPU-bound work with 4 threads and is surprised it's no faster than one thread. Explain why, and what to use instead.",
+       code:
+`import threading
+
+def crunch(rows):                    # pure CPU work, no I/O
+    return sum(r * r for r in rows)
+
+threads = [threading.Thread(target=crunch, args=(chunk,))
+           for chunk in chunks]      # 4 chunks
+for t in threads: t.start()
+for t in threads: t.join()`,
+       a:"The Global Interpreter Lock (GIL) lets only one thread run Python code at a time, so CPU-bound threads take turns rather than running in parallel — you get concurrency, not parallelism, and near-zero speedup (plus thread overhead). Use processes for separate interpreters across cores, or a C-extension that releases the lock.",
+       acode:
+`from concurrent.futures import ProcessPoolExecutor
+
+def crunch(rows):
+    return sum(r * r for r in rows)
+
+with ProcessPoolExecutor() as pool:
+    results = list(pool.map(crunch, chunks))   # true parallelism`}
+    ]},
   { id:"packaging", name:"Venvs & packaging", why:"Your DevOps home turf — strong answers here on isolation, lockfiles, and slim Docker images stand out.",
     points:[
       "venv isolates per-project deps; pip installs; pin in pyproject.toml (modern) rather than a loose requirements.txt.",
@@ -819,6 +1018,7 @@ USER 1000                         # non-root
 CMD ["python", "app.py"]`}
     ]}
 ]},
+
 { id:"tier3", label:"Tier 3", sub:"Good to know — mention if relevant", color:"#82AAFF", topics:[
   { id:"httpx", name:"httpx", why:"The standard async HTTP client for calling LLM and external APIs.",
     points:["Async HTTP client; reuse one AsyncClient for connection pooling; always set timeouts; use async with (or app lifespan) for cleanup."],
@@ -1014,141 +1214,9 @@ for item in items:
 seen = {u.id for u in users}         # set: O(1) membership`}
     ]}
 ]},
-{ id:"ai", label:"AI-specific", sub:"The thin layer on top", color:"#C792EA", topics:[
-  { id:"sdk", name:"SDK calls & tool schemas", why:"The messages format and tool definitions are the vocabulary of every agent framework.",
-    points:[
-      "messages = a list of {role, content}. Tools/functions are defined with a JSON schema (from Pydantic).",
-      "The model returns either a final message or a tool_call you must execute and feed back.",
-      "stop_reason (or finish_reason) tells you whether a tool call is pending."
-    ],
-    code:[
-      {file:"sdk_call.py", src:
-`resp = await client.messages.create(
-    model="<model-name>", max_tokens=1024,
-    messages=[{"role": "user", "content": "weather in Dubai?"}],
-    tools=tools,
-)
-# resp.stop_reason == "tool_use" -> a tool call is pending`}
-    ],
-    drills:[
-      {q:"Given this response object, write the branch that decides whether to run a tool or return the final answer.",
-       code:
-`resp = await client.messages.create(model=M, messages=msgs, tools=tools)
-# resp.stop_reason -> "tool_use" | "end_turn"
-# resp.content     -> list of blocks (text and/or tool_use)`,
-       a:"Branch on stop_reason. 'tool_use' means at least one tool_use block is pending: execute each requested tool, append the results back as a tool_result message, and loop. Otherwise it's the final answer — return the text.",
-       acode:
-`if resp.stop_reason == "tool_use":
-    results = []
-    for block in resp.content:
-        if block.type == "tool_use":
-            out = await tools[block.name](**block.input)
-            results.append({"type": "tool_result",
-                            "tool_use_id": block.id, "content": str(out)})
-    msgs.append({"role": "user", "content": results})   # loop again
-else:
-    return resp.text                                    # final answer`}
-    ]},
-  { id:"agentloop", name:"The agent loop", why:"The single most likely 'sketch this on the whiteboard' request. Be able to write it in ~20 lines from memory.",
-    points:[
-      "The pattern: send prompt, model returns tool call, execute the function, feed the result back, repeat until a final answer.",
-      "Always bound the loop with a max-iterations guard so a misbehaving model can't spin forever.",
-      "Append both the assistant's message and the tool results to messages so the model has the full history each turn."
-    ],
-    code:[
-      {file:"agent_loop.py", src:
-`async def agent(client, tools, user_msg, max_steps=10):
-    messages = [{"role": "user", "content": user_msg}]
 
-    for _ in range(max_steps):                  # always bound the loop
-        resp = await client.messages.create(
-            model="<model>", max_tokens=1024,
-            messages=messages, tools=tool_schemas(tools),
-        )
-        messages.append({"role": "assistant", "content": resp.content})
-
-        if resp.stop_reason != "tool_use":       # final answer -> done
-            return resp.text
-
-        results = []
-        for block in resp.tool_use_blocks():     # run each requested tool
-            out = await tools[block.name](**block.input)
-            results.append({
-                "type": "tool_result",
-                "tool_use_id": block.id,
-                "content": str(out),
-            })
-        messages.append({"role": "user", "content": results})  # feed back
-
-    raise RuntimeError("agent exceeded max steps")`}
-    ],
-    drills:[
-      {q:"Sketch the full agent tool-calling loop from scratch (~20 lines). What two things must it ALWAYS have?",
-       code:
-`# the shape they want on the whiteboard:
-#   send messages + tools  ->  model replies
-#   if tool call: run tool, feed result back, repeat
-#   else: return final answer`,
-       a:"It must (1) append both the assistant message and the tool results every turn, so the model keeps full context, and (2) be bounded by a max-steps guard so a misbehaving model can't loop forever. Everything else is the branch on stop_reason.",
-       acode:
-`async def agent(client, tools, user_msg, max_steps=10):
-    messages = [{"role": "user", "content": user_msg}]
-    for _ in range(max_steps):                 # (2) bounded
-        resp = await client.messages.create(
-            model=M, max_tokens=1024,
-            messages=messages, tools=schemas(tools))
-        messages.append({"role": "assistant", "content": resp.content})
-        if resp.stop_reason != "tool_use":
-            return resp.text                    # final answer
-        results = []
-        for b in resp.tool_use_blocks():
-            out = await tools[b.name](**b.input)
-            results.append({"type": "tool_result",
-                            "tool_use_id": b.id, "content": str(out)})
-        messages.append({"role": "user", "content": results})  # (1) feed back
-    raise RuntimeError("exceeded max steps")`}
-    ]},
-  { id:"streaming", name:"Streaming responses", why:"Async generator + SSE through FastAPI — the delivery mechanism for a chat UI.",
-    points:[
-      "Stream tokens as they arrive via an async generator that yields each chunk.",
-      "Return it from FastAPI with StreamingResponse and media type text/event-stream (SSE).",
-      "Each chunk is a data: ... frame separated by a blank line; finish with a sentinel like [DONE]."
-    ],
-    code:[
-      {file:"stream_sse.py", src:
-`from fastapi.responses import StreamingResponse
-
-async def token_stream(prompt: str):
-    async with client.messages.stream(prompt=prompt) as stream:
-        async for text in stream.text_stream:
-            yield f"data: {text}\\n\\n"           # SSE frame
-    yield "data: [DONE]\\n\\n"`}
-    ],
-    drills:[
-      {q:"Users complain they stare at a spinner for 10s before seeing anything. Turn this blocking endpoint into one that streams tokens to the browser as they're generated.",
-       code:
-`@app.post("/chat")
-async def chat(prompt: str):
-    text = await client.complete(prompt)   # waits for the FULL answer
-    return {"text": text}                  # then returns all at once`,
-       a:"Stream instead of buffering: an async generator yields each token as it arrives, returned via StreamingResponse with media_type text/event-stream (SSE). Each chunk is a 'data: ...' frame ending in a blank line, closed with a [DONE] sentinel. The browser renders tokens live, so time-to-first-token drops from 10s to ~instant.",
-       acode:
-`from fastapi.responses import StreamingResponse
-
-async def gen(prompt):
-    async with client.stream(prompt) as s:
-        async for tok in s.text_stream:
-            yield f"data: {tok}\\n\\n"
-    yield "data: [DONE]\\n\\n"
-
-@app.post("/chat")
-async def chat(prompt: str):
-    return StreamingResponse(gen(prompt),
-                             media_type="text/event-stream")`}
-    ]}
-]},
 { id:"meta", label:"How they test", sub:"Format & what to rehearse", color:"#F78C6C", topics:[
-  { id:"format", name:"The interview format", why:"CTOs at this level rarely do LeetCode. Knowing the shape of the questions lets you rehearse the exact right things.",
+  { id:"format", name:"The interview format", why:"Senior technical interviews for this kind of role rarely lean on algorithm puzzles. Knowing the shape of the questions lets you rehearse the exact right things.",
     points:[
       "Expect practical prompts, not algorithm puzzles: 'write a retry decorator', 'here's an async endpoint calling a blocking function, what's wrong', 'sketch the agent tool-calling loop', or 'review this snippet for bugs'.",
       "Rehearse until automatic — the async blocking trap, the retry decorator, the agent loop, and a transaction commit/rollback.",
@@ -1175,7 +1243,7 @@ async def chat(prompt: str):
     ],
     drills:[
       {q:"REHEARSE — 'write a retry decorator.' Talk through it out loud, then check yourself.",
-       a:"Factory retry(attempts) -> decorator -> wrapper that loops attempts times, re-raising on the last try, with @functools.wraps, specific exceptions, and backoff between tries. See Tier 2 · Decorators for the full solution."},
+       a:"Factory retry(attempts) -> decorator -> wrapper that loops attempts times, re-raising on the last try, with @functools.wraps, specific exceptions, and backoff between tries. See Tier 1 · Decorators for the full solution."},
       {q:"REHEARSE — 'here's an async endpoint calling a blocking function; what's wrong?' Diagnose it out loud.",
        code:
 `@app.get("/data")
