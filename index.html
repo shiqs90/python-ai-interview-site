@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python for AI · Interview Prep</title>
+<meta name="description" content="A free interactive study console for Python interviews focused on AI / agent platform roles — async, FastAPI, the agent loop, reliability patterns, and rapid-fire drills. Runs in any browser.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Python for AI — Interview Prep">
+<meta property="og:description" content="Interactive study console: async, FastAPI, the agent loop, reliability patterns, and code-based drills. Study + drill modes, progress tracking, runs in any browser.">
+<meta property="og:image" content="preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Python for AI — Interview Prep">
+<meta name="twitter:description" content="Interactive study console: async, FastAPI, the agent loop, reliability patterns, and code-based drills. Runs in any browser, tracks your progress.">
+<meta name="twitter:image" content="preview.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B1622'/%3E%3Cpath d='M10 9 L18 16 L10 23' fill='none' stroke='%23FFCB6B' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M19 22 L24 22' stroke='%237FDBCA' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0B1622; --bg2:#0E1B2A; --panel:#122234; --panelHi:#16293D;
+  --border:#1E3A52; --borderSoft:#17293b;
+  --text:#D6DEEB; --muted:#8497AD; --faint:#5B6E82;
+  --gold:#FFCB6B; --teal:#7FDBCA; --blue:#82AAFF; --violet:#C792EA;
+  --green:#C3E88D; --orange:#F78C6C; --red:#EF6B73;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased;}
+button{font-family:inherit;cursor:pointer;}
+*:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:3px;}
+.app{display:flex;flex-direction:column;min-height:100vh;}
+
+/* topbar */
+.topbar{display:flex;align-items:center;gap:18px;padding:12px 22px;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:40;}
+.hamburger{display:none;background:none;border:1px solid var(--border);color:var(--text);font-size:18px;width:38px;height:38px;border-radius:8px;}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-glyph{font-family:var(--mono);color:var(--gold);font-size:18px;font-weight:600;letter-spacing:-1px;}
+.brand-title{font-weight:700;font-size:15px;letter-spacing:-0.2px;}
+.brand-sub{font-family:var(--mono);font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:1.5px;}
+.modes{display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:10px;border:1px solid var(--border);margin-left:8px;}
+.mode{background:none;border:none;color:var(--muted);padding:6px 16px;border-radius:7px;font-size:13px;font-weight:600;transition:.15s;}
+.mode.on{background:var(--panelHi);color:var(--text);}
+.progress{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.progress-num{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--gold);}
+.progress-den{color:var(--faint);font-size:12px;}
+.progress-bar{width:120px;height:6px;background:var(--panel);border-radius:99px;overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--teal));border-radius:99px;transition:width .4s ease;}
+.progress-lbl{font-family:var(--mono);font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:1px;}
+
+/* layout */
+.body{display:flex;flex:1;min-height:0;}
+.sidebar{width:300px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);overflow:hidden;}
+.sidebar-scroll{height:calc(100vh - 63px);overflow-y:auto;padding:20px 14px 40px;position:sticky;top:63px;}
+.sec{margin-bottom:26px;}
+.sec-head{display:flex;align-items:flex-start;gap:10px;padding:0 8px 10px;}
+.sec-tick{width:3px;align-self:stretch;border-radius:2px;min-height:26px;}
+.sec-labels{flex:1;}
+.sec-label{font-family:var(--mono);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;}
+.sec-sub{font-size:11px;color:var(--faint);margin-top:2px;}
+.sec-count{font-family:var(--mono);font-size:10.5px;color:var(--faint);}
+.topics{list-style:none;margin:0;padding:0;}
+.topic-btn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:none;border-left:2px solid transparent;color:var(--muted);padding:8px 10px;border-radius:0 7px 7px 0;font-size:13.5px;transition:.12s;}
+.topic-btn:hover{background:var(--panel);color:var(--text);}
+.topic-btn.active{background:var(--panel);color:var(--text);font-weight:600;}
+.topic-dot{width:9px;height:9px;border-radius:99px;border:1.5px solid var(--faint);flex-shrink:0;transition:.15s;}
+.topic-name{flex:1;}
+.sidebar-foot{font-size:11.5px;color:var(--faint);padding:14px 10px;border-top:1px solid var(--borderSoft);margin-top:8px;line-height:1.6;}
+.scrim{display:none;}
+
+/* content */
+.content{flex:1;overflow-y:auto;height:calc(100vh - 63px);}
+.topic{max-width:760px;margin:0 auto;padding:40px 32px 80px;}
+.topic-eyebrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.eyebrow-tag{font-family:var(--mono);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;border:1px solid;padding:4px 10px;border-radius:99px;}
+.eyebrow-index{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:1px;}
+.topic-title{font-size:34px;font-weight:700;letter-spacing:-0.8px;margin:0 0 20px;line-height:1.1;}
+.why{border-left:3px solid;background:var(--bg2);padding:14px 18px;border-radius:0 10px 10px 0;margin-bottom:34px;}
+.why-lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;}
+.why p{margin:6px 0 0;font-size:15px;color:var(--text);}
+.h2{font-size:13px;font-family:var(--mono);text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin:38px 0 14px;font-weight:600;}
+.points{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;}
+.points li{display:flex;gap:11px;font-size:14.5px;color:var(--text);}
+.point-mark{font-size:13px;margin-top:2px;flex-shrink:0;}
+code.inline{font-family:var(--mono);font-size:0.85em;background:var(--panel);color:var(--teal);padding:1.5px 6px;border-radius:5px;border:1px solid var(--borderSoft);}
+
+/* code block */
+.code{background:#071019;border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;}
+.code-tab{display:flex;align-items:center;gap:7px;padding:9px 14px;background:var(--bg2);border-bottom:1px solid var(--border);}
+.dot{width:10px;height:10px;border-radius:99px;}
+.code-file{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-left:6px;}
+.copy{margin-left:auto;background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10.5px;padding:3px 10px;border-radius:6px;transition:.12s;}
+.copy:hover{color:var(--text);border-color:var(--faint);}
+.code-body{margin:0;padding:14px 0;overflow-x:auto;font-family:var(--mono);font-size:12.8px;line-height:1.65;}
+.code-line{display:flex;padding:0 16px;}
+.code-line:hover{background:rgba(130,170,255,0.04);}
+.gutter{width:30px;flex-shrink:0;text-align:right;padding-right:16px;color:#2E4358;user-select:none;}
+.ln{white-space:pre;color:#CBD6E4;}
+/* compact code (used inside drills / flashcards) */
+.code.mini{margin:12px 0 0;border-radius:10px;}
+.mini-tab{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--border);}
+.mini-label{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:1.5px;color:var(--faint);}
+.code.mini .code-body{font-size:12px;padding:11px 0;}
+
+/* inline drills */
+.drills{display:flex;flex-direction:column;gap:10px;}
+.drill{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg2);}
+.drill.open{border-color:var(--faint);}
+.drill-q{display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;background:none;border:none;color:var(--text);padding:14px 16px;font-size:14px;}
+.drill-mark{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:1.5px;color:var(--gold);border:1px solid var(--border);padding:3px 7px;border-radius:5px;flex-shrink:0;margin-top:1px;}
+.drill-text{flex:1;font-weight:500;line-height:1.5;}
+.drill-caret{font-family:var(--mono);font-size:18px;color:var(--faint);flex-shrink:0;line-height:1;}
+.drill-code{padding:0 16px 6px;}
+.drill-a{padding:2px 16px 16px;font-size:14px;color:var(--text);line-height:1.7;}
+.drill-a .code.mini{margin-top:14px;}
+.drill:not(.open) .drill-a{display:none;}
+.answer-lbl{display:block;font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:1.5px;color:var(--green);margin-bottom:7px;}
+
+/* topic foot */
+.topic-foot{margin-top:40px;padding-top:24px;border-top:1px solid var(--borderSoft);display:flex;flex-direction:column;gap:18px;}
+.review-btn{align-self:flex-start;background:var(--panel);border:1px solid var(--border);color:var(--muted);padding:9px 20px;border-radius:9px;font-size:13.5px;font-weight:600;transition:.15s;}
+.review-btn:hover{color:var(--text);}
+.review-btn.done{background:var(--bg2);}
+.nav-pair{display:flex;gap:10px;flex-wrap:wrap;}
+.pager{background:var(--bg2);border:1px solid var(--border);color:var(--muted);padding:9px 16px;border-radius:9px;font-size:13px;transition:.15s;}
+.pager:hover{color:var(--text);border-color:var(--faint);}
+
+/* drill mode */
+.drillmode{max-width:720px;margin:0 auto;padding:40px 32px 80px;}
+.drill-head{margin-bottom:28px;}
+.drill-intro{color:var(--muted);font-size:15px;margin:8px 0 20px;}
+.drill-filters{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{background:var(--bg2);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;padding:6px 12px;border-radius:99px;transition:.12s;}
+.chip:hover{color:var(--text);}
+.chip.on{background:var(--panel);font-weight:600;}
+.flash-meta{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;}
+.flash-topic{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;}
+.flash-count{font-family:var(--mono);font-size:12px;color:var(--faint);}
+.flash{width:100%;min-height:220px;text-align:left;color:var(--text);border:1px solid var(--border);border-top:3px solid var(--accent,var(--gold));border-radius:14px;background:var(--bg2);padding:28px 26px;transition:border-color .15s;display:block;cursor:pointer;}
+.flash:hover{border-color:var(--faint);}
+.flash-face{display:flex;flex-direction:column;gap:12px;}
+.flash-tag{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--faint);}
+.flash-q{font-size:20px;font-weight:600;line-height:1.4;margin:0;letter-spacing:-0.3px;color:var(--text);}
+.flash-a{font-size:15px;line-height:1.7;margin:0;color:var(--text);}
+.flash .code.mini{margin-top:16px;}
+.flash-hint{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:6px;}
+.flash:not(.flipped) .flash-back{display:none;}
+.flash.flipped .flash-front{display:none;}
+.flash-controls{display:flex;gap:10px;margin-top:16px;}
+.pager.wide{flex:1;text-align:center;}
+.pager.primary{background:var(--panelHi);color:var(--text);}
+.empty{color:var(--muted);}
+
+@media (max-width:860px){
+  .hamburger{display:block;}
+  .brand-sub{display:none;}
+  .progress-bar,.progress-lbl{display:none;}
+  .sidebar{position:fixed;left:0;top:63px;bottom:0;z-index:45;transform:translateX(-100%);transition:transform .22s ease;width:290px;}
+  .sidebar.open{transform:translateX(0);box-shadow:0 0 40px rgba(0,0,0,.5);}
+  .sidebar-scroll{height:100%;position:static;}
+  .scrim.show{display:block;position:fixed;inset:63px 0 0 0;background:rgba(3,8,14,.6);z-index:44;}
+  .topic,.drillmode{padding:28px 20px 70px;}
+  .topic-title{font-size:27px;}
+  .modes{margin-left:0;}
+}
+@media (max-width:520px){
+  .topbar{gap:10px;padding:10px 14px;}
+  .brand-title{font-size:13px;}
+  .mode{padding:6px 12px;font-size:12px;}
+  .flash-q{font-size:18px;}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;}}
+</style>
+</head>
+<body>
+<div id="app" class="app"></div>
+
+<script>
+"use strict";
+
+/* ================= syntax highlighter ================= */
+var KW = new Set(("False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield").split(" "));
+var BI = new Set(("print len range enumerate zip map filter sorted sum min max abs isinstance type str int float bool list dict set tuple open super property staticmethod classmethod object Exception ValueError TypeError ConnectionError RuntimeError KeyError TimeoutError").split(" "));
+var SP = new Set(["self","cls"]);
+var SYN = {kw:"#C792EA",str:"#C3E88D",num:"#F78C6C",fn:"#82AAFF",bi:"#7FDBCA",dec:"#FFCB6B",com:"#54687C",sp:"#F78C6C",punc:"#8497AD",def:null};
+var LINE_RE = /(#[^\n]*)|(f?r?"(?:\\.|[^"\\])*"|f?r?'(?:\\.|[^'\\])*')|(@\w+)|(\b\d[\d_]*\.?\d*\b)|([A-Za-z_]\w*)|(\s+)|([^\sA-Za-z0-9_#'"@]+)|(.)/g;
+
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+function tokenizeLine(line){
+  var out=[], m; LINE_RE.lastIndex=0;
+  while((m=LINE_RE.exec(line))!==null){
+    if(m[1]) out.push([m[1],SYN.com]);
+    else if(m[2]) out.push([m[2],SYN.str]);
+    else if(m[3]) out.push([m[3],SYN.dec]);
+    else if(m[4]) out.push([m[4],SYN.num]);
+    else if(m[5]){
+      var id=m[5]; var after=line.slice(LINE_RE.lastIndex).match(/^\s*\(/);
+      if(KW.has(id)) out.push([id,SYN.kw]);
+      else if(SP.has(id)) out.push([id,SYN.sp]);
+      else if(after) out.push([id,SYN.fn]);
+      else if(BI.has(id)) out.push([id,SYN.bi]);
+      else out.push([id,null]);
+    }
+    else if(m[6]) out.push([m[6],null]);
+    else if(m[7]) out.push([m[7],SYN.punc]);
+    else out.push([m[0],null]);
+  }
+  return out;
+}
+
+function codeRows(src){
+  var lines = src.replace(/\n$/,"").split("\n");
+  return lines.map(function(ln,i){
+    var inner = ln.length===0 ? " " : tokenizeLine(ln).map(function(t){
+      return t[1] ? '<span style="color:'+t[1]+'">'+esc(t[0])+'</span>' : esc(t[0]);
+    }).join("");
+    return '<div class="code-line"><span class="gutter">'+(i+1)+'</span><span class="ln">'+inner+'</span></div>';
+  }).join("");
+}
+
+function codeBlock(file, src){
+  return '<div class="code"><div class="code-tab">'
+    +'<span class="dot" style="background:#ff5f57"></span>'
+    +'<span class="dot" style="background:#febc2e"></span>'
+    +'<span class="dot" style="background:#28c840"></span>'
+    +'<span class="code-file">'+esc(file)+'</span>'
+    +'<button class="copy" data-action="copy" data-src="'+encodeURIComponent(src)+'">copy</button>'
+    +'</div><pre class="code-body">'+codeRows(src)+'</pre></div>';
+}
+
+function codeMini(src, label){
+  return '<div class="code mini"><div class="mini-tab"><span class="mini-label">'+esc(label)+'</span>'
+    +'<button class="copy" data-action="copy" data-src="'+encodeURIComponent(src)+'">copy</button></div>'
+    +'<pre class="code-body">'+codeRows(src)+'</pre></div>';
+}
+
+function withCode(text){
+  return text.split("`").map(function(p,i){
+    return i%2===1 ? '<code class="inline">'+esc(p)+'</code>' : esc(p);
+  }).join("");
+}
+
+/* ================= curriculum ================= */
+var CURRICULUM = [
+{ id:"tier1", label:"Tier 1", sub:"Will definitely be asked", color:"#FFCB6B", topics:[
+  { id:"async", name:"Async programming", why:"The #1 topic for this role. An agent juggles many concurrent I/O calls — async is how one thread does that without blocking.",
+    points:[
+      "A coroutine is defined with `async def`. Calling it returns a coroutine object that does nothing until awaited or scheduled on the event loop.",
+      "`await` yields control back to the loop while waiting on I/O, letting other coroutines run. One thread, cooperative multitasking.",
+      "Async wins for I/O-bound work (API calls, DB queries, network) where you mostly wait. It does NOT speed up CPU-bound work — a busy loop still blocks the loop.",
+      "Threads: OS-scheduled, share memory, held back by the GIL for CPU work but fine for blocking I/O with sync libs. Processes: separate memory, true parallelism, for CPU-bound work.",
+      "`asyncio.gather()` runs awaitables concurrently and returns results in argument order.",
+      "The trap: a blocking call (time.sleep, requests.get) inside a coroutine freezes the entire event loop. Use asyncio.sleep, httpx, or asyncio.to_thread."
+    ],
+    code:[
+      {file:"basics.py", src:
+`import asyncio
+
+async def fetch(name: str, delay: float) -> str:
+    await asyncio.sleep(delay)   # non-blocking; yields to the loop
+    return name
+
+async def main() -> None:
+    # sequential: ~3s total
+    await fetch("a", 1)
+    await fetch("b", 2)
+
+    # concurrent: ~2s total (bounded by the slowest)
+    results = await asyncio.gather(
+        fetch("c", 1),
+        fetch("d", 2),
+    )
+    print(results)   # ['c', 'd'] -- order preserved
+
+asyncio.run(main())`},
+      {file:"the_blocking_trap.py", src:
+`import asyncio, time
+
+# BUG: time.sleep blocks the WHOLE event loop.
+async def bad():
+    time.sleep(2)          # blocking!
+    # requests.get(url)    # also blocking -> use httpx
+
+# Fix 1: await a real async call
+async def good():
+    await asyncio.sleep(2)
+
+# Fix 2: offload unavoidable blocking work to a thread
+async def good_offload():
+    await asyncio.to_thread(time.sleep, 2)`}
+    ],
+    drills:[
+      {q:"This FastAPI endpoint is meant to handle many concurrent requests, but under load they queue up one behind another and latency explodes. What's wrong, and how do you fix it?",
+       code:
+`import requests
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/price/{symbol}")
+async def get_price(symbol: str):          # called ~200x/sec
+    resp = requests.get(f"https://api.exchange.com/{symbol}")
+    return {"symbol": symbol, "price": resp.json()["last"]}`,
+       a:"requests.get is synchronous. Because the handler is async, that blocking call freezes the single event-loop thread — every other in-flight request stalls until it returns, so the endpoint effectively serializes. Fix: use an async client and await it (reuse one client for connection pooling). If you must keep a sync library, offload it with await asyncio.to_thread(requests.get, url).",
+       acode:
+`import httpx
+from fastapi import FastAPI
+
+app = FastAPI()
+client = httpx.AsyncClient(timeout=10.0)   # created once, pooled
+
+@app.get("/price/{symbol}")
+async def get_price(symbol: str):
+    resp = await client.get(f"https://api.exchange.com/{symbol}")
+    resp.raise_for_status()
+    return {"symbol": symbol, "price": resp.json()["last"]}`},
+      {q:"These three lookups are independent but the function takes ~1s because they run one after another. Make them run concurrently.",
+       code:
+`async def gather_context(query: str):
+    a = await search_docs(query)     # ~300ms
+    b = await search_web(query)      # ~500ms
+    c = await search_memory(query)   # ~200ms
+    return combine(a, b, c)          # total ~= 1000ms`,
+       a:"They're awaited sequentially, so the latencies add up. Since they don't depend on each other, run them concurrently with asyncio.gather — total time drops to the slowest call (~500ms). Results come back in argument order, so unpacking is safe.",
+       acode:
+`import asyncio
+
+async def gather_context(query: str):
+    a, b, c = await asyncio.gather(
+        search_docs(query),
+        search_web(query),
+        search_memory(query),
+    )                                # total ~= 500ms
+    return combine(a, b, c)`},
+      {q:"Coroutines vs threads vs processes — when do you reach for each?",
+       a:"Coroutines (asyncio): one thread, cooperative, ideal for lots of concurrent I/O (API/DB calls) — exactly what an agent does. Threads: OS-scheduled, share memory, good for blocking I/O with sync libraries, but the GIL means no speedup for CPU work. Processes: separate memory, real multi-core parallelism, for CPU-bound work."}
+    ]},
+  { id:"gil", name:"The GIL", why:"Explains why threads don't speed up CPU work and why multiprocessing exists — a classic conceptual check.",
+    points:[
+      "The Global Interpreter Lock lets only one thread execute Python bytecode at a time in CPython.",
+      "So multithreading gives no speedup for CPU-bound work — threads take turns, never running Python in parallel.",
+      "Threads DO help for I/O-bound work: a thread releases the GIL while blocked on I/O, so others run.",
+      "For real CPU parallelism use multiprocessing (separate processes, separate interpreters) or native/C libs that release the GIL.",
+      "Worth a mention: CPython 3.13 ships an experimental free-threaded (no-GIL) build, but the GIL is still the default and the interview-relevant model."
+    ],
+    code:[
+      {file:"gil.py", src:
+`import threading, multiprocessing as mp
+
+def cpu_bound(n: int) -> int:
+    return sum(i * i for i in range(n))
+
+N = 10_000_000
+
+# Threads: ~no speedup for CPU work -- the GIL serializes them.
+def with_threads():
+    t = [threading.Thread(target=cpu_bound, args=(N,)) for _ in range(4)]
+    for x in t: x.start()
+    for x in t: x.join()
+
+# Processes: real parallelism across cores.
+def with_processes():
+    with mp.Pool(4) as pool:
+        pool.map(cpu_bound, [N] * 4)`}
+    ],
+    drills:[
+      {q:"A teammate 'parallelized' this CPU-bound work with 4 threads and is surprised it's no faster than one thread. Explain why, and what to use instead.",
+       code:
+`import threading
+
+def crunch(rows):                    # pure CPU work, no I/O
+    return sum(r * r for r in rows)
+
+threads = [threading.Thread(target=crunch, args=(chunk,))
+           for chunk in chunks]      # 4 chunks
+for t in threads: t.start()
+for t in threads: t.join()`,
+       a:"The GIL lets only one thread run Python bytecode at a time, so CPU-bound threads take turns rather than running in parallel — you get concurrency, not parallelism, and near-zero speedup (plus thread overhead). Use processes for separate interpreters across cores, or a C-extension that releases the GIL.",
+       acode:
+`from concurrent.futures import ProcessPoolExecutor
+
+def crunch(rows):
+    return sum(r * r for r in rows)
+
+with ProcessPoolExecutor() as pool:
+    results = list(pool.map(crunch, chunks))   # true parallelism`}
+    ]},
+  { id:"fastapi", name:"FastAPI + Pydantic", why:"The web framework for the role. Pydantic models are also how you define tool/function schemas for LLMs and how you parse structured output back.",
+    points:[
+      "Pydantic BaseModel validates and coerces input and serializes output; FastAPI uses it for request/response bodies and auto-generates OpenAPI docs.",
+      "The same model shape is what you hand an LLM as a tool schema (model_json_schema()) and what you parse tool-call arguments back into (model_validate_json).",
+      "Depends() injects shared resources (DB session, current user), created per request and easy to override in tests.",
+      "Return status codes intentionally: 200 ok, 201 created, 202 accepted (async job queued), 422 validation (automatic).",
+      "BackgroundTasks for light in-process fire-and-forget work; Celery/queue for heavy, retryable, cross-process jobs."
+    ],
+    code:[
+      {file:"app.py", src:
+`from fastapi import FastAPI, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+
+app = FastAPI()
+
+class ChatRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=4000)
+    temperature: float = Field(0.7, ge=0, le=2)
+
+class ChatResponse(BaseModel):
+    text: str
+    tokens: int
+
+async def get_llm_client():          # dependency
+    client = LLMClient()
+    try:
+        yield client                 # injected value
+    finally:
+        await client.aclose()        # cleanup after response
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(req: ChatRequest, client=Depends(get_llm_client)):
+    out = await client.complete(req.prompt, temperature=req.temperature)
+    return ChatResponse(text=out.text, tokens=out.tokens)`}
+    ],
+    drills:[
+      {q:"A reviewer says of this endpoint: 'the client shouldn't sit and wait 30 seconds, and this shouldn't tie up a web worker.' What do you change, and what status code do you return?",
+       code:
+`@app.post("/reports")
+async def create_report(req: ReportRequest):
+    data = build_report(req)      # heavy, ~30s
+    save(data)
+    return {"status": "done"}     # returns 200 after 30s`,
+       a:"Don't block the request for 30s. Queue the work and return 202 Accepted immediately with a job id the client can poll. Light in-process work could use FastAPI BackgroundTasks, but a 30s heavy job that must survive restarts and retry belongs on a real queue (Celery), not tying up a web worker.",
+       acode:
+`from fastapi import status
+
+@app.post("/reports", status_code=status.HTTP_202_ACCEPTED)
+async def create_report(req: ReportRequest):
+    job_id = build_report.delay(req.model_dump()).id   # Celery task
+    return {"status": "queued", "job_id": job_id}`},
+      {q:"The model returned this tool call as JSON. Spot the risk in parsing it into a plain dict, and show the safer approach.",
+       code:
+`# the model emitted this for a tool call:
+raw = '{"city": "Dubai", "unit": "kelvin"}'
+args = json.loads(raw)                 # just a dict, no checks
+temp = get_weather(args["city"], args["unit"])   # 'kelvin'?!`,
+       a:"A dict trusts whatever the model emitted — missing keys, wrong types, or invalid values (unit='kelvin') flow straight into your function. Define the tool's arguments as a Pydantic model: it gives you (1) the JSON schema to send the model as the tool definition and (2) validation on the way back, so bad output raises instead of corrupting the call.",
+       acode:
+`from typing import Literal
+from pydantic import BaseModel
+
+class GetWeather(BaseModel):
+    city: str
+    unit: Literal["celsius", "fahrenheit"] = "celsius"
+
+args = GetWeather.model_validate_json(raw)   # raises on 'kelvin'
+temp = get_weather(args.city, args.unit)`}
+    ]},
+  { id:"errors", name:"Error handling & reliability", why:"Platform code lives or dies on how it handles the external calls that fail. Reliability questions land here.",
+    points:[
+      "try/except/finally: finally always runs (cleanup). Catch specific exceptions, never a bare except.",
+      "Custom exceptions give your failures a typed vocabulary — subclass Exception.",
+      "Exception chaining: raise NewError(...) from err preserves the original cause in the traceback.",
+      "Retries with backoff (tenacity) for transient failures: exponential backoff + jitter, capped attempts, retry only retryable errors.",
+      "Put a timeout on every external call — no unbounded waits."
+    ],
+    code:[
+      {file:"exceptions.py", src:
+`class ToolError(Exception):
+    """Base for tool failures."""
+
+def run_tool(name: str):
+    try:
+        return _invoke(name)
+    except ConnectionError as err:
+        # chain: keeps the original traceback as __cause__
+        raise ToolError(f"tool {name!r} unreachable") from err
+    finally:
+        _release_slot(name)          # always runs`}
+    ],
+    drills:[
+      {q:"What's the difference between A and B, and which should you prefer when re-raising a domain exception?",
+       code:
+`# A
+try:
+    fetch()
+except ConnectionError:
+    raise ToolError("upstream unavailable")
+
+# B
+try:
+    fetch()
+except ConnectionError as err:
+    raise ToolError("upstream unavailable") from err`,
+       a:"B chains the exceptions: 'from err' sets __cause__, so the traceback shows both your ToolError and the original ConnectionError ('The above exception was the direct cause...'). A discards the root cause, making production debugging painful. Prefer B when re-raising; use 'from None' only when you deliberately want to suppress the original.",
+       acode:null},
+      {q:"Make this LLM call production-safe. Name what's missing.",
+       code:
+`async def complete(prompt: str) -> str:
+    resp = await client.post("/v1/complete", json={"prompt": prompt})
+    return resp.json()["text"]`,
+       a:"Three gaps: no timeout (it can hang forever), no status check (a 500/429 body becomes garbage output), and no retry on transient failures. Add a timeout on the call, raise_for_status, and retry only transient errors (network, 429, 5xx) with exponential backoff and a cap — don't retry 4xx. Keep it idempotent if it has side effects.",
+       acode:
+`from tenacity import (retry, stop_after_attempt,
+    wait_exponential, retry_if_exception_type)
+import httpx
+
+@retry(stop=stop_after_attempt(4),
+       wait=wait_exponential(multiplier=0.5, max=8),
+       retry=retry_if_exception_type(httpx.HTTPError), reraise=True)
+async def complete(prompt: str) -> str:
+    resp = await client.post("/v1/complete",
+                             json={"prompt": prompt}, timeout=10.0)
+    resp.raise_for_status()
+    return resp.json()["text"]`}
+    ]},
+  { id:"ctx", name:"Context managers", why:"The with block — the idiomatic way to guarantee cleanup (connections, locks, files). Interviewers ask you to write one.",
+    points:[
+      "with guarantees __exit__ runs even on exception — deterministic cleanup.",
+      "Write one as a class (__enter__/__exit__) or, more concisely, with @contextmanager and a generator: yield the resource, clean up after.",
+      "__exit__ can suppress an exception by returning True (rarely what you want).",
+      "async with for async resources (DB sessions, httpx clients)."
+    ],
+    code:[
+      {file:"context_managers.py", src:
+`from contextlib import contextmanager
+import time
+
+@contextmanager
+def timer(label: str):
+    start = time.perf_counter()
+    try:
+        yield                         # the with-body runs here
+    finally:
+        print(f"{label}: {time.perf_counter() - start:.3f}s")
+
+with timer("db-query"):
+    run_query()`}
+    ],
+    drills:[
+      {q:"Write a context manager that acquires this lock and ALWAYS releases it, even if the body raises. Show both the @contextmanager and the class form.",
+       code:
+`import threading
+lock = threading.Lock()
+
+# you want this usage to never leak the lock, even on error:
+with acquire(lock):
+    do_critical_work()      # may raise`,
+       a:"Guarantee the release in a finally (generator form) or __exit__ (class form) — both run even when the body raises. That's the whole point of a context manager: deterministic cleanup.",
+       acode:
+`from contextlib import contextmanager
+
+@contextmanager
+def acquire(lock):
+    lock.acquire()
+    try:
+        yield lock
+    finally:
+        lock.release()          # always runs
+
+# class form:
+class acquire:
+    def __init__(self, lock): self.lock = lock
+    def __enter__(self):
+        self.lock.acquire(); return self.lock
+    def __exit__(self, *exc):
+        self.lock.release()     # always runs`}
+    ]}
+]},
+{ id:"tier2", label:"Tier 2", sub:"Very likely — be conversational", color:"#7FDBCA", topics:[
+  { id:"types", name:"Type hints", why:"Modern AI codebases are fully typed. Expect casual questions on Optional / Union / generics.",
+    points:[
+      "Hints don't affect runtime; they power editors, mypy/pyright, and Pydantic/FastAPI validation.",
+      "Optional[X] is exactly X | None. Union[A, B] is A | B.",
+      "Generics: list[int], dict[str, User], Callable[[int], str], TypeVar for generic functions.",
+      "Modern style (3.9+/3.10+): builtins are subscriptable (list[int]); prefer X | None over Optional[X]."
+    ],
+    code:[
+      {file:"type_hints.py", src:
+`from typing import TypeVar
+
+T = TypeVar("T")
+
+def first(items: list[T]) -> T | None:   # generic + optional
+    return items[0] if items else None
+
+def env(key: str, default: str | None = None) -> str | None:
+    return _lookup(key) or default`}
+    ],
+    drills:[
+      {q:"A reviewer flags these type hints as dated. Modernize them for Python 3.10+.",
+       code:
+`from typing import Optional, Union, List, Dict
+
+def parse(items: List[str]) -> Optional[Dict[str, int]]:
+    ...
+
+def coerce(x: Union[int, str]) -> int:
+    ...`,
+       a:"On 3.10+, builtins are subscriptable and the | operator replaces Union/Optional, so you drop the typing imports entirely. Optional[X] is exactly X | None.",
+       acode:
+`def parse(items: list[str]) -> dict[str, int] | None:
+    ...
+
+def coerce(x: int | str) -> int:
+    ...`}
+    ]},
+  { id:"decorators", name:"Decorators", why:"The classic 'do you really know Python' test. They'll ask you to write a timing or retry decorator live.",
+    points:[
+      "A decorator is a callable that takes a function and returns a (usually wrapping) function.",
+      "@functools.wraps preserves the wrapped function's name, docstring, and signature metadata.",
+      "A decorator that takes arguments is one more layer: a factory that returns a decorator."
+    ],
+    code:[
+      {file:"decorators.py", src:
+`import functools, time
+
+def timed(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            print(f"{fn.__name__}: {time.perf_counter()-start:.3f}s")
+    return wrapper`}
+    ],
+    drills:[
+      {q:"Write a retry decorator: retry the wrapped function up to `attempts` times with exponential backoff, re-raising if all attempts fail. It must work as decorated below.",
+       code:
+`@retry(attempts=3, base_delay=0.5)
+def fetch_config():
+    return httpx.get("https://config.svc/app").json()`,
+       a:"A decorator that takes arguments is a factory — three layers: factory(args) returns the decorator, which wraps the function. Loop attempts times; re-raise on the last failure; sleep base_delay * 2**i between tries. Use @functools.wraps so the function keeps its name/docstring, and in real code catch specific exceptions rather than bare Exception.",
+       acode:
+`import functools, time
+
+def retry(attempts=3, base_delay=0.5):
+    def deco(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            for i in range(attempts):
+                try:
+                    return fn(*args, **kwargs)
+                except Exception:
+                    if i == attempts - 1:
+                        raise
+                    time.sleep(base_delay * 2 ** i)
+        return wrapper
+    return deco`},
+      {q:"After adding this decorator, help(flaky) shows the name 'wrapper' and the docstring is gone. Why, and what's the one-line fix?",
+       code:
+`def timed(fn):
+    def wrapper(*args, **kwargs):
+        return fn(*args, **kwargs)
+    return wrapper
+
+@timed
+def flaky():
+    "Does a flaky thing."
+    ...`,
+       a:"The decorator replaced flaky with the inner wrapper function, so introspection now sees wrapper's name and its (missing) docstring. Fix: decorate wrapper with @functools.wraps(fn), which copies __name__, __doc__, and the signature from the real function onto the wrapper.",
+       acode:
+`import functools
+
+def timed(fn):
+    @functools.wraps(fn)        # <- the fix
+    def wrapper(*args, **kwargs):
+        return fn(*args, **kwargs)
+    return wrapper`}
+    ]},
+  { id:"generators", name:"Generators & iterators", why:"Streaming LLM responses is literally a generator pattern — and the memory-efficiency question.",
+    points:[
+      "yield makes a generator: lazy, produces values one at a time, holds only current state — constant memory over huge or infinite streams.",
+      "An iterator implements __iter__/__next__; generators give you that for free.",
+      "Async generators (async def + yield) are how you stream tokens from an LLM out through FastAPI as SSE."
+    ],
+    code:[
+      {file:"generators.py", src:
+`# streaming LLM tokens as an async generator
+async def stream_completion(prompt: str):
+    async for chunk in client.stream(prompt):
+        yield chunk.text            # token-by-token, constant memory`}
+    ],
+    drills:[
+      {q:"This runs fine on small files but OOMs on a 5GB log. Rewrite it to stream, and explain why that fixes the memory blow-up.",
+       code:
+`def error_lines(path):
+    lines = open(path).read().splitlines()   # whole file in RAM
+    return [ln for ln in lines if "ERROR" in ln]
+
+for ln in error_lines("huge.log"):
+    handle(ln)`,
+       a:"read() pulls the entire file into memory, and the list comprehension then holds every matching line too. A generator yields one line at a time and iterates the file object lazily, so memory stays flat regardless of file size. This is the same pattern as streaming LLM tokens instead of buffering the full response.",
+       acode:
+`def error_lines(path):
+    with open(path) as f:
+        for ln in f:                 # lazy: one line at a time
+            if "ERROR" in ln:
+                yield ln.rstrip("\\n")`}
+    ]},
+  { id:"models", name:"Dataclass vs Pydantic vs dict", why:"A 'when would you use each' judgment question that shows production sense.",
+    points:[
+      "dict: quick, no schema, no validation — fine for throwaway/JSON-ish blobs, error-prone in production.",
+      "@dataclass: typed struct with autogenerated __init__/__repr__/__eq__, no validation, stdlib, cheap. Great for internal value objects.",
+      "Pydantic BaseModel: validation + coercion + serialization at the boundary (API input, LLM output, config). Heavier.",
+      "Rule of thumb: Pydantic at the edges, dataclasses inside, dicts only for genuinely unstructured data."
+    ],
+    code:[
+      {file:"models.py", src:
+`from dataclasses import dataclass
+from pydantic import BaseModel
+
+@dataclass
+class Point:            # internal, trusted, no validation
+    x: int
+    y: int
+
+class UserIn(BaseModel):   # boundary: validates & coerces
+    id: int
+    email: str
+
+UserIn(id="7", email="a@b.com")   # id coerced to int 7`}
+    ],
+    drills:[
+      {q:"This config is loaded from a YAML/env source at startup, where everything arrives as a string. A teammate modelled it with a dataclass. What breaks, and what would you use instead?",
+       code:
+`from dataclasses import dataclass
+
+@dataclass
+class Config:
+    port: int
+    debug: bool
+
+raw = {"port": "8080", "debug": "true"}   # all strings
+cfg = Config(**raw)
+cfg.port + 1      # TypeError: can only concatenate str (not "int")`,
+       a:"A dataclass doesn't validate or coerce, so port stays the string '8080' and debug the string 'true' — the failure surfaces later, far from the cause. Config comes from outside the program (a trust boundary), so use Pydantic: it coerces '8080'->8080 and 'true'->True and raises clearly on bad input. Keep dataclasses for internal, already-trusted structs.",
+       acode:
+`from pydantic import BaseModel
+
+class Config(BaseModel):
+    port: int
+    debug: bool
+
+cfg = Config(**raw)   # port -> 8080 (int), debug -> True (bool)
+cfg.port + 1          # 8081`}
+    ]},
+  { id:"json", name:"JSON handling", why:"Serialization edge cases and parsing LLM structured output safely both come up.",
+    points:[
+      "json.dumps/loads — the edge cases are non-native types: datetime, Decimal, set, UUID all raise TypeError by default.",
+      "Handle with a custom default= (or cls=), or use Pydantic which serializes these for you.",
+      "Parsing LLM output: never eval. json.loads inside try/except, then validate with Pydantic. Be ready for the model to wrap JSON in prose or code fences."
+    ],
+    code:[
+      {file:"json_edges.py", src:
+`import json
+
+# parse LLM output safely -> validated model, not a raw dict
+def parse_tool_args(raw: str, Model):
+    try:
+        return Model.model_validate_json(raw)   # loads + validates
+    except Exception as e:
+        raise ToolError("model returned invalid JSON") from e`}
+    ],
+    drills:[
+      {q:"This serializer passes tests but 500s in production the moment a record has a timestamp or money field. Why, and how do you fix it without hand-touching every field?",
+       code:
+`import json
+from datetime import datetime
+from decimal import Decimal
+
+record = {"id": 7, "created": datetime.utcnow(), "amount": Decimal("9.99")}
+body = json.dumps(record)     # TypeError: not JSON serializable`,
+       a:"json.dumps only knows native JSON types; datetime and Decimal raise TypeError. Pass a default= hook that converts the odd types in one place (or serialize via a Pydantic model, which handles them). Never reach for eval or ad-hoc str() patching.",
+       acode:
+`def default(o):
+    if isinstance(o, datetime): return o.isoformat()
+    if isinstance(o, Decimal):  return float(o)
+    raise TypeError(f"not serializable: {type(o)}")
+
+body = json.dumps(record, default=default)`}
+    ]},
+  { id:"packaging", name:"Venvs & packaging", why:"Your DevOps home turf — strong answers here on isolation, lockfiles, and slim Docker images stand out.",
+    points:[
+      "venv isolates per-project deps; pip installs; pin in pyproject.toml (modern) rather than a loose requirements.txt.",
+      "uv / poetry give faster, lockfile-based dependency management; uv is the current momentum tool.",
+      "Docker angle: multi-stage builds, slim base images, install deps in a builder layer, copy only what runs, don't run as root, exploit layer caching (copy lockfile, install, then copy source)."
+    ],
+    code:[
+      {file:"setup.sh", src:
+`python -m venv .venv && source .venv/bin/activate
+pip install fastapi "uvicorn[standard]"
+
+# uv (fast, lockfile-based)
+uv init && uv add fastapi httpx tenacity
+uv run uvicorn app:app --reload`}
+    ],
+    drills:[
+      {q:"Review this Dockerfile for a Python service. Name three things you'd change and why.",
+       code:
+`FROM python:3.12
+WORKDIR /app
+COPY . .
+RUN pip install -r requirements.txt
+CMD ["python", "app.py"]`,
+       a:"(1) Base image: python:3.12 is ~1GB; use -slim to cut it dramatically. (2) Layer caching: COPY . . before the install busts the pip cache on every source change — copy requirements first, install, then copy source. (3) It runs as root — add a non-root USER. Bonus: a multi-stage build keeps build deps out of the final image, and pin deps via a lockfile for reproducibility.",
+       acode:
+`FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .            # cache layer: only busts on dep change
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+USER 1000                         # non-root
+CMD ["python", "app.py"]`}
+    ]}
+]},
+{ id:"tier3", label:"Tier 3", sub:"Good to know — mention if relevant", color:"#82AAFF", topics:[
+  { id:"httpx", name:"httpx", why:"The standard async HTTP client for calling LLM and external APIs.",
+    points:["Async HTTP client; reuse one AsyncClient for connection pooling; always set timeouts; use async with (or app lifespan) for cleanup."],
+    code:[
+      {file:"httpx_client.py", src:
+`import httpx
+
+async def main():
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        r = await client.post("https://api.example.com/v1/x",
+                               json={"q": "hi"})
+        r.raise_for_status()
+        data = r.json()`}
+    ],
+    drills:[
+      {q:"This helper is called thousands of times a minute and is slow / churns sockets. What's the anti-pattern, and the fix?",
+       code:
+`async def get_user(uid: str):
+    async with httpx.AsyncClient() as client:   # new client per call
+        r = await client.get(f"https://api/users/{uid}")
+        return r.json()`,
+       a:"Creating a fresh AsyncClient on every call throws away connection pooling and TLS session reuse and churns sockets. Create one shared client at startup (or via app lifespan), reuse it everywhere, always set a timeout, and close it on shutdown.",
+       acode:
+`client = httpx.AsyncClient(timeout=10.0)   # created once, reused
+
+async def get_user(uid: str):
+    r = await client.get(f"https://api/users/{uid}")
+    r.raise_for_status()
+    return r.json()`}
+    ]},
+  { id:"sqlalchemy", name:"SQLAlchemy basics", why:"You don't need ORM mastery — just show a transaction commit/rollback and the async session shape.",
+    points:[
+      "Session = unit of work. Async engine + AsyncSession for async apps.",
+      "Transaction: commit on success, rollback on error. async with session.begin() auto-commits or rolls back."
+    ],
+    code:[
+      {file:"sqlalchemy_async.py", src:
+`from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+
+engine = create_async_engine("postgresql+asyncpg://...")
+Session = async_sessionmaker(engine)`}
+    ],
+    drills:[
+      {q:"Write a DB operation that must be atomic: create an order AND decrement stock, rolling back BOTH if either step fails.",
+       code:
+`# must never decrement stock without creating the order,
+# and must never create an order if stock is insufficient:
+async def place_order(item_id: int, qty: int):
+    ...`,
+       a:"Wrap both writes in one transaction. async with session.begin() commits if the block completes and rolls back on any exception — so raising OutOfStock mid-way undoes the order insert too. That atomicity is the whole reason to use a transaction here.",
+       acode:
+`async def place_order(item_id: int, qty: int):
+    async with Session() as session:
+        async with session.begin():          # commit on success,
+            item = await session.get(Item, item_id)   # rollback on error
+            if item.stock < qty:
+                raise OutOfStock(item_id)     # -> whole tx rolls back
+            item.stock -= qty
+            session.add(Order(item_id=item_id, qty=qty))`}
+    ]},
+  { id:"celery", name:"Celery", why:"The queue for heavy, retryable background jobs — know tasks, retries, and idempotency.",
+    points:[
+      "Distributed task queue; @app.task defines a task; retries via self.retry / autoretry_for.",
+      "Idempotency keys so a retried or duplicated task doesn't double-charge or double-send."
+    ],
+    code:[
+      {file:"tasks.py", src:
+`from celery import Celery
+app = Celery("jobs", broker="redis://localhost:6379/0")`}
+    ],
+    drills:[
+      {q:"This task charges a customer, and occasionally a customer gets charged twice. What's the cause, and how do you fix it?",
+       code:
+`@app.task(bind=True, max_retries=3, autoretry_for=(TimeoutError,))
+def charge(self, order_id: str):
+    amount = lookup(order_id)
+    payment_gateway.charge(amount)   # succeeds...
+    mark_paid(order_id)              # ...but THIS times out -> retry`,
+       a:"Queues are at-least-once and this task auto-retries. If the gateway charge succeeds but a later step (mark_paid) times out, the retry runs charge again — double charge. Make it idempotent: guard on state you can check, and pass a stable idempotency key to the gateway so a repeated request is a no-op.",
+       acode:
+`@app.task(bind=True, max_retries=3, autoretry_for=(TimeoutError,))
+def charge(self, order_id: str):
+    if is_paid(order_id):            # guard: already done
+        return
+    amount = lookup(order_id)
+    payment_gateway.charge(amount, idempotency_key=order_id)
+    mark_paid(order_id)`}
+    ]},
+  { id:"logging", name:"Logging", why:"Structured logs + correlation IDs tie directly into the audit-trail requirement for an agent platform.",
+    points:[
+      "Use logging, not print. Emit structured JSON logs for machines.",
+      "Thread a correlation/request ID through every log line to trace one request across services — this is your audit trail.",
+      "structlog gives ergonomic structured logging with bound context."
+    ],
+    code:[
+      {file:"logging_setup.py", src:
+`import structlog
+log = structlog.get_logger().bind(request_id=req_id)
+log.info("chat.start", prompt_tokens=42)`}
+    ],
+    drills:[
+      {q:"During an incident you can't tell which log lines across your gateway, agent, and tool services belong to the same request. What logging change fixes this?",
+       code:
+`# gateway service
+logging.info("received request")
+# agent service
+logging.info("calling tool")
+# tool service
+logging.info("done")
+# ...which lines belong to the same user request? impossible to tell`,
+       a:"Generate a correlation/request id at the edge, propagate it downstream (e.g. an X-Request-ID header), and bind it to every log line via structured logging. Then filter all services by that one id to reconstruct the full path — which doubles as your audit trail.",
+       acode:
+`import structlog
+log = structlog.get_logger().bind(request_id=req_id)
+
+log.info("received_request", route="/chat")
+log.info("calling_tool", tool="search")   # every line carries request_id`}
+    ]},
+  { id:"testing", name:"Testing", why:"Expect 'how do you test code that calls an LLM?' — the answer is: mock the model, test your orchestration.",
+    points:[
+      "pytest + fixtures. Mock external calls so tests are deterministic and offline.",
+      "unittest.mock / monkeypatch for the SDK; respx to mock httpx.",
+      "Testing LLM code: mock the model client to return canned responses (including a scripted tool call) and assert on the loop — did it call the right tool, feed the result back, terminate — not on the model's exact wording."
+    ],
+    code:[
+      {file:"test_agent.py", src:
+`import pytest
+from unittest.mock import AsyncMock
+
+@pytest.mark.asyncio
+async def test_agent_calls_tool():
+    client = AsyncMock()
+    client.messages.create.side_effect = [tool_use_resp, final_resp]
+    ...`}
+    ],
+    drills:[
+      {q:"How would you unit-test this agent step WITHOUT calling a real model or a real weather API? Write the test shape.",
+       code:
+`async def agent_step(client, tools, messages):
+    resp = await client.messages.create(messages=messages, tools=tools)
+    if resp.stop_reason == "tool_use":
+        b = resp.tool_use_blocks()[0]
+        out = await tools[b.name](**b.input)
+        return {"role": "user", "content": out}
+    return resp.text`,
+       a:"Mock the model client and the tool. Script the client to return a tool-use response, stub the tool to return a canned value, then assert your orchestration: the right tool was called with the right args and its output was fed back. You assert on control flow, never on the model's wording (which is non-deterministic).",
+       acode:
+`async def test_agent_step_runs_tool():
+    client = AsyncMock()
+    client.messages.create.return_value = ToolUseResp(
+        "get_weather", {"city": "Dubai"})
+    weather = AsyncMock(return_value="40C")
+
+    out = await agent_step(client, {"get_weather": weather}, [])
+
+    weather.assert_awaited_once_with(city="Dubai")
+    assert out["content"] == "40C"`}
+    ]},
+  { id:"ds", name:"Data structures", why:"dict/set operations, comprehensions, and the collections helpers show fluent Python.",
+    points:[
+      "dict/set give O(1) membership and lookup.",
+      "Comprehensions for concise transforms; dict/set comprehensions too.",
+      "collections: defaultdict (auto-init missing keys), Counter (frequencies), deque (fast ends)."
+    ],
+    code:[
+      {file:"data_structures.py", src:
+`from collections import defaultdict, Counter
+
+counts = Counter(tokens)                 # frequency map
+squares = {x: x * x for x in range(5)}   # dict comprehension`}
+    ],
+    drills:[
+      {q:"Make this idiomatic and fix the performance smell. There are two issues.",
+       code:
+`groups = {}
+for item in items:
+    if item.kind not in groups:      # manual key check
+        groups[item.kind] = []
+    groups[item.kind].append(item)
+
+seen = []
+for u in users:
+    if u.id not in seen:             # O(n) membership on a list
+        seen.append(u.id)`,
+       a:"(1) The manual 'key not in dict, then init' dance is exactly what defaultdict(list) removes. (2) 'in' on a list is O(n), so the second loop is O(n^2); a set gives O(1) membership. Small changes, big difference at scale.",
+       acode:
+`from collections import defaultdict
+
+groups = defaultdict(list)
+for item in items:
+    groups[item.kind].append(item)
+
+seen = {u.id for u in users}         # set: O(1) membership`}
+    ]}
+]},
+{ id:"ai", label:"AI-specific", sub:"The thin layer on top", color:"#C792EA", topics:[
+  { id:"sdk", name:"SDK calls & tool schemas", why:"The messages format and tool definitions are the vocabulary of every agent framework.",
+    points:[
+      "messages = a list of {role, content}. Tools/functions are defined with a JSON schema (from Pydantic).",
+      "The model returns either a final message or a tool_call you must execute and feed back.",
+      "stop_reason (or finish_reason) tells you whether a tool call is pending."
+    ],
+    code:[
+      {file:"sdk_call.py", src:
+`resp = await client.messages.create(
+    model="<model-name>", max_tokens=1024,
+    messages=[{"role": "user", "content": "weather in Dubai?"}],
+    tools=tools,
+)
+# resp.stop_reason == "tool_use" -> a tool call is pending`}
+    ],
+    drills:[
+      {q:"Given this response object, write the branch that decides whether to run a tool or return the final answer.",
+       code:
+`resp = await client.messages.create(model=M, messages=msgs, tools=tools)
+# resp.stop_reason -> "tool_use" | "end_turn"
+# resp.content     -> list of blocks (text and/or tool_use)`,
+       a:"Branch on stop_reason. 'tool_use' means at least one tool_use block is pending: execute each requested tool, append the results back as a tool_result message, and loop. Otherwise it's the final answer — return the text.",
+       acode:
+`if resp.stop_reason == "tool_use":
+    results = []
+    for block in resp.content:
+        if block.type == "tool_use":
+            out = await tools[block.name](**block.input)
+            results.append({"type": "tool_result",
+                            "tool_use_id": block.id, "content": str(out)})
+    msgs.append({"role": "user", "content": results})   # loop again
+else:
+    return resp.text                                    # final answer`}
+    ]},
+  { id:"agentloop", name:"The agent loop", why:"The single most likely 'sketch this on the whiteboard' request. Be able to write it in ~20 lines from memory.",
+    points:[
+      "The pattern: send prompt, model returns tool call, execute the function, feed the result back, repeat until a final answer.",
+      "Always bound the loop with a max-iterations guard so a misbehaving model can't spin forever.",
+      "Append both the assistant's message and the tool results to messages so the model has the full history each turn."
+    ],
+    code:[
+      {file:"agent_loop.py", src:
+`async def agent(client, tools, user_msg, max_steps=10):
+    messages = [{"role": "user", "content": user_msg}]
+
+    for _ in range(max_steps):                  # always bound the loop
+        resp = await client.messages.create(
+            model="<model>", max_tokens=1024,
+            messages=messages, tools=tool_schemas(tools),
+        )
+        messages.append({"role": "assistant", "content": resp.content})
+
+        if resp.stop_reason != "tool_use":       # final answer -> done
+            return resp.text
+
+        results = []
+        for block in resp.tool_use_blocks():     # run each requested tool
+            out = await tools[block.name](**block.input)
+            results.append({
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": str(out),
+            })
+        messages.append({"role": "user", "content": results})  # feed back
+
+    raise RuntimeError("agent exceeded max steps")`}
+    ],
+    drills:[
+      {q:"Sketch the full agent tool-calling loop from scratch (~20 lines). What two things must it ALWAYS have?",
+       code:
+`# the shape they want on the whiteboard:
+#   send messages + tools  ->  model replies
+#   if tool call: run tool, feed result back, repeat
+#   else: return final answer`,
+       a:"It must (1) append both the assistant message and the tool results every turn, so the model keeps full context, and (2) be bounded by a max-steps guard so a misbehaving model can't loop forever. Everything else is the branch on stop_reason.",
+       acode:
+`async def agent(client, tools, user_msg, max_steps=10):
+    messages = [{"role": "user", "content": user_msg}]
+    for _ in range(max_steps):                 # (2) bounded
+        resp = await client.messages.create(
+            model=M, max_tokens=1024,
+            messages=messages, tools=schemas(tools))
+        messages.append({"role": "assistant", "content": resp.content})
+        if resp.stop_reason != "tool_use":
+            return resp.text                    # final answer
+        results = []
+        for b in resp.tool_use_blocks():
+            out = await tools[b.name](**b.input)
+            results.append({"type": "tool_result",
+                            "tool_use_id": b.id, "content": str(out)})
+        messages.append({"role": "user", "content": results})  # (1) feed back
+    raise RuntimeError("exceeded max steps")`}
+    ]},
+  { id:"streaming", name:"Streaming responses", why:"Async generator + SSE through FastAPI — the delivery mechanism for a chat UI.",
+    points:[
+      "Stream tokens as they arrive via an async generator that yields each chunk.",
+      "Return it from FastAPI with StreamingResponse and media type text/event-stream (SSE).",
+      "Each chunk is a data: ... frame separated by a blank line; finish with a sentinel like [DONE]."
+    ],
+    code:[
+      {file:"stream_sse.py", src:
+`from fastapi.responses import StreamingResponse
+
+async def token_stream(prompt: str):
+    async with client.messages.stream(prompt=prompt) as stream:
+        async for text in stream.text_stream:
+            yield f"data: {text}\\n\\n"           # SSE frame
+    yield "data: [DONE]\\n\\n"`}
+    ],
+    drills:[
+      {q:"Users complain they stare at a spinner for 10s before seeing anything. Turn this blocking endpoint into one that streams tokens to the browser as they're generated.",
+       code:
+`@app.post("/chat")
+async def chat(prompt: str):
+    text = await client.complete(prompt)   # waits for the FULL answer
+    return {"text": text}                  # then returns all at once`,
+       a:"Stream instead of buffering: an async generator yields each token as it arrives, returned via StreamingResponse with media_type text/event-stream (SSE). Each chunk is a 'data: ...' frame ending in a blank line, closed with a [DONE] sentinel. The browser renders tokens live, so time-to-first-token drops from 10s to ~instant.",
+       acode:
+`from fastapi.responses import StreamingResponse
+
+async def gen(prompt):
+    async with client.stream(prompt) as s:
+        async for tok in s.text_stream:
+            yield f"data: {tok}\\n\\n"
+    yield "data: [DONE]\\n\\n"
+
+@app.post("/chat")
+async def chat(prompt: str):
+    return StreamingResponse(gen(prompt),
+                             media_type="text/event-stream")`}
+    ]}
+]},
+{ id:"meta", label:"How they test", sub:"Format & what to rehearse", color:"#F78C6C", topics:[
+  { id:"format", name:"The interview format", why:"CTOs at this level rarely do LeetCode. Knowing the shape of the questions lets you rehearse the exact right things.",
+    points:[
+      "Expect practical prompts, not algorithm puzzles: 'write a retry decorator', 'here's an async endpoint calling a blocking function, what's wrong', 'sketch the agent tool-calling loop', or 'review this snippet for bugs'.",
+      "Rehearse until automatic — the async blocking trap, the retry decorator, the agent loop, and a transaction commit/rollback.",
+      "You do NOT need pandas/numpy/PyTorch — this is platform engineering, not data science.",
+      "Two things to build from scratch beforehand: a small FastAPI app with one async endpoint, and the agent loop (plus a Celery task with a retry). That covers ~70% of what they can throw at you."
+    ],
+    code:[
+      {file:"rehearse.md", src:
+`# Build these cold, twice each, before the interview:
+
+# 1. FastAPI app  -> one async endpoint
+#    - Pydantic request/response models
+#    - a Depends() dependency (fake DB/client)
+#    - correct status code (202 for a queued job)
+
+# 2. The agent loop  (~20 lines, from memory)
+#    - messages list, tool schemas
+#    - execute tool -> append tool_result -> repeat
+#    - max_steps guard
+
+# 3. A Celery task
+#    - @app.task with max_retries + autoretry_for
+#    - an idempotency-key guard`}
+    ],
+    drills:[
+      {q:"REHEARSE — 'write a retry decorator.' Talk through it out loud, then check yourself.",
+       a:"Factory retry(attempts) -> decorator -> wrapper that loops attempts times, re-raising on the last try, with @functools.wraps, specific exceptions, and backoff between tries. See Tier 2 · Decorators for the full solution."},
+      {q:"REHEARSE — 'here's an async endpoint calling a blocking function; what's wrong?' Diagnose it out loud.",
+       code:
+`@app.get("/data")
+async def get_data():
+    return requests.get("https://slow.api/data").json()`,
+       a:"The blocking call (requests / time.sleep) freezes the whole event loop, serializing every concurrent request. Fix with an async client + await, or push it to asyncio.to_thread. See Tier 1 · Async programming.",
+       acode:null},
+      {q:"REHEARSE — 'sketch the agent tool-calling loop.' Write it from memory.",
+       a:"Bounded loop: call model with messages+tools; if not a tool call, return the final answer; else run each tool, append tool_result messages, repeat; raise past max steps. See AI-specific · The agent loop."},
+      {q:"REHEARSE — 'review this snippet for bugs.' What's your mental checklist?",
+       a:"Scan for: blocking calls inside async, missing timeouts on external calls, bare except / swallowed errors, no retry on transient failures, unbounded loops, missing input validation, resources not closed (no context manager), and non-idempotent side effects on a retryable path."}
+    ]}
+]}
+];
+
+/* flatten */
+var ALL_TOPICS = [];
+CURRICULUM.forEach(function(s){ s.topics.forEach(function(t){ ALL_TOPICS.push(Object.assign({},t,{color:s.color,sectionLabel:s.label,sectionId:s.id})); }); });
+var ALL_DRILLS = [];
+CURRICULUM.forEach(function(s){ s.topics.forEach(function(t){ (t.drills||[]).forEach(function(d){ ALL_DRILLS.push(Object.assign({},d,{topic:t.name,color:s.color,section:s.label,sectionId:s.id})); }); }); });
+
+/* ================= state + persistence ================= */
+var LS_KEY = "pyprep:reviewed:v1";
+function loadReviewed(){ try{ return new Set(JSON.parse(localStorage.getItem(LS_KEY)||"[]")); }catch(e){ return new Set(); } }
+function saveReviewed(set){ try{ localStorage.setItem(LS_KEY, JSON.stringify(Array.from(set))); }catch(e){} }
+
+var state = {
+  mode:"study",
+  activeId: ALL_TOPICS[0].id,
+  reviewed: loadReviewed(),
+  navOpen:false,
+  drillFilter:"all",
+  drillIndex:0,
+  flipped:false
+};
+
+function findTopic(id){ for(var i=0;i<ALL_TOPICS.length;i++){ if(ALL_TOPICS[i].id===id) return ALL_TOPICS[i]; } return ALL_TOPICS[0]; }
+function findSection(id){ for(var i=0;i<CURRICULUM.length;i++){ if(CURRICULUM[i].topics.some(function(t){return t.id===id;})) return CURRICULUM[i]; } return CURRICULUM[0]; }
+function pad(n){ return (n<10?"0":"")+n; }
+
+/* ================= render ================= */
+var app = document.getElementById("app");
+
+function render(){
+  var total = ALL_TOPICS.length, done = state.reviewed.size;
+  var pct = total ? (done/total*100) : 0;
+  var html = ''
+  + '<header class="topbar">'
+  +   '<button class="hamburger" data-action="toggleNav" aria-label="Toggle topics">&#8801;</button>'
+  +   '<div class="brand"><span class="brand-glyph">&gt;&gt;&gt;</span><div>'
+  +     '<div class="brand-title">Python for AI</div>'
+  +     '<div class="brand-sub">Interview prep console</div></div></div>'
+  +   '<div class="modes">'
+  +     '<button class="mode '+(state.mode==="study"?"on":"")+'" data-action="setMode" data-mode="study">Study</button>'
+  +     '<button class="mode '+(state.mode==="drill"?"on":"")+'" data-action="setMode" data-mode="drill">Drill</button>'
+  +   '</div>'
+  +   '<div class="progress"><span class="progress-num">'+done+'<span class="progress-den">/'+total+'</span></span>'
+  +     '<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%"></div></div>'
+  +     '<span class="progress-lbl">reviewed</span></div>'
+  + '</header>'
+  + '<div class="body">'
+  +   sidebarHTML()
+  +   '<div class="scrim '+(state.navOpen?"show":"")+'" data-action="closeNav"></div>'
+  +   '<main class="content" id="content">'+(state.mode==="study"?studyHTML():drillHTML())+'</main>'
+  + '</div>';
+  app.innerHTML = html;
+}
+
+function sidebarHTML(){
+  var out = '<aside class="sidebar '+(state.navOpen?"open":"")+'"><div class="sidebar-scroll">';
+  CURRICULUM.forEach(function(sec){
+    var secDone = sec.topics.filter(function(t){return state.reviewed.has(t.id);}).length;
+    out += '<div class="sec"><div class="sec-head">'
+      + '<span class="sec-tick" style="background:'+sec.color+'"></span>'
+      + '<div class="sec-labels"><div class="sec-label" style="color:'+sec.color+'">'+esc(sec.label)+'</div>'
+      + '<div class="sec-sub">'+esc(sec.sub)+'</div></div>'
+      + '<span class="sec-count">'+secDone+'/'+sec.topics.length+'</span></div><ul class="topics">';
+    sec.topics.forEach(function(t){
+      var isActive = (t.id===state.activeId && state.mode==="study");
+      var isRev = state.reviewed.has(t.id);
+      out += '<li><button class="topic-btn '+(isActive?"active":"")+'" data-action="goTopic" data-id="'+t.id+'"'
+        + (isActive?' style="border-left-color:'+sec.color+'"':'')+'>'
+        + '<span class="topic-dot '+(isRev?"on":"")+'"'+(isRev?' style="background:'+sec.color+';border-color:'+sec.color+'"':'')+'></span>'
+        + '<span class="topic-name">'+esc(t.name)+'</span></button></li>';
+    });
+    out += '</ul></div>';
+  });
+  var all = state.reviewed.size===ALL_TOPICS.length;
+  out += '<div class="sidebar-foot">'+(all
+    ? "Every topic reviewed. Switch to Drill mode and go cold."
+    : "Tap the dot as you master each topic — progress saves in this browser.")+'</div>';
+  out += '</div></aside>';
+  return out;
+}
+
+function studyHTML(){
+  var t = findTopic(state.activeId), sec = findSection(state.activeId);
+  var idx = ALL_TOPICS.map(function(x){return x.id;}).indexOf(t.id);
+  var total = ALL_TOPICS.length;
+  var prev = idx>0 ? ALL_TOPICS[idx-1] : null;
+  var next = idx<total-1 ? ALL_TOPICS[idx+1] : null;
+  var isRev = state.reviewed.has(t.id);
+
+  var out = '<article class="topic" style="--accent:'+sec.color+'">'
+    + '<div class="topic-eyebrow"><span class="eyebrow-tag" style="color:'+sec.color+';border-color:'+sec.color+'">'+esc(sec.label)+'</span>'
+    + '<span class="eyebrow-index">'+pad(idx+1)+' / '+pad(total)+'</span></div>'
+    + '<h1 class="topic-title">'+esc(t.name)+'</h1>'
+    + '<div class="why" style="border-color:'+sec.color+'"><span class="why-lbl" style="color:'+sec.color+'">why it matters</span><p>'+esc(t.why)+'</p></div>'
+    + '<h2 class="h2">Key points</h2><ul class="points">';
+  t.points.forEach(function(p){
+    out += '<li><span class="point-mark" style="color:'+sec.color+'">&#9657;</span><span>'+withCode(p)+'</span></li>';
+  });
+  out += '</ul><h2 class="h2">Code</h2>';
+  t.code.forEach(function(c){ out += codeBlock(c.file, c.src); });
+
+  if(t.drills && t.drills.length){
+    out += '<h2 class="h2">Test yourself</h2><div class="drills">';
+    t.drills.forEach(function(d){
+      out += '<div class="drill"><button class="drill-q" data-action="toggleDrill">'
+        + '<span class="drill-mark">DRILL</span><span class="drill-text">'+esc(d.q)+'</span><span class="drill-caret">+</span></button>'
+        + (d.code ? '<div class="drill-code">'+codeMini(d.code, "code")+'</div>' : '')
+        + '<div class="drill-a"><span class="answer-lbl">answer</span>'+esc(d.a)
+        + (d.acode ? codeMini(d.acode, "the fix") : '') + '</div></div>';
+    });
+    out += '</div>';
+  }
+
+  out += '<div class="topic-foot">'
+    + '<button class="review-btn '+(isRev?"done":"")+'" data-action="toggleReviewed" data-id="'+t.id+'"'
+    + (isRev?' style="border-color:'+sec.color+';color:'+sec.color+'"':'')+'>'
+    + (isRev?"&#10003; Reviewed":"Mark as reviewed")+'</button><div class="nav-pair">'
+    + (prev?'<button class="pager" data-action="goTopic" data-id="'+prev.id+'">&#8592; '+esc(prev.name)+'</button>':'')
+    + (next?'<button class="pager" data-action="goTopic" data-id="'+next.id+'">'+esc(next.name)+' &#8594;</button>':'')
+    + '</div></div></article>';
+  return out;
+}
+
+function drillHTML(){
+  var list = state.drillFilter==="all" ? ALL_DRILLS : ALL_DRILLS.filter(function(d){return d.sectionId===state.drillFilter;});
+  var filters = [{id:"all",label:"All",color:"#D6DEEB"}].concat(CURRICULUM.map(function(s){return {id:s.id,label:s.label,color:s.color};}));
+  if(state.drillIndex>=list.length) state.drillIndex=0;
+  var card = list[state.drillIndex];
+
+  var out = '<div class="drillmode"><div class="drill-head"><h1 class="topic-title">Drill deck</h1>'
+    + '<p class="drill-intro">Read the question and the code, answer out loud, then flip for the fix. These are the exact shapes they will throw at you.</p>'
+    + '<div class="drill-filters">';
+  filters.forEach(function(f){
+    var on = state.drillFilter===f.id;
+    out += '<button class="chip '+(on?"on":"")+'" data-action="drillFilter" data-f="'+f.id+'"'
+      + (on?' style="color:'+f.color+';border-color:'+f.color+'"':'')+'>'+esc(f.label)+'</button>';
+  });
+  out += '</div></div>';
+
+  if(card){
+    var front = '<div class="flash-face flash-front"><span class="flash-tag">question</span>'
+      + '<p class="flash-q">'+esc(card.q)+'</p>'
+      + (card.code ? codeMini(card.code, "the code") : '')
+      + '<span class="flash-hint">tap, press Reveal, or hit space to flip</span></div>';
+    var back = '<div class="flash-face flash-back"><span class="flash-tag" style="color:'+card.color+'">answer</span>'
+      + '<p class="flash-a">'+esc(card.a)+'</p>'
+      + (card.acode ? codeMini(card.acode, "the fix") : '') + '</div>';
+
+    out += '<div class="flashwrap"><div class="flash-meta">'
+      + '<span class="flash-topic" style="color:'+card.color+'">'+esc(card.section)+' &middot; '+esc(card.topic)+'</span>'
+      + '<span class="flash-count">'+(state.drillIndex+1)+' / '+list.length+'</span></div>'
+      + '<div class="flash '+(state.flipped?"flipped":"")+'" data-action="drillFlip" role="button" tabindex="0" style="--accent:'+card.color+'">'
+      + front + back + '</div>'
+      + '<div class="flash-controls">'
+      + '<button class="pager wide" data-action="drillNav" data-dir="-1">&#8592; Prev</button>'
+      + '<button class="pager wide primary" data-action="drillFlip">'+(state.flipped?"Hide":"Reveal")+'</button>'
+      + '<button class="pager wide" data-action="drillNav" data-dir="1">Next &#8594;</button>'
+      + '</div></div>';
+  } else {
+    out += '<p class="empty">No drills in this filter.</p>';
+  }
+  out += '</div>';
+  return out;
+}
+
+/* ================= copy with fallback ================= */
+function copyText(text, btn){
+  function done(){ if(btn){ var o=btn.textContent; btn.textContent="copied \u2713"; setTimeout(function(){btn.textContent=o;},1400);} }
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(done, fallback);
+  } else { fallback(); }
+  function fallback(){
+    var ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); done(); }catch(e){}
+    document.body.removeChild(ta);
+  }
+}
+
+/* ================= events (delegated) ================= */
+app.addEventListener("click", function(e){
+  var el = e.target.closest("[data-action]");
+  if(!el) return;
+  var a = el.getAttribute("data-action");
+  if(a==="toggleNav"){ state.navOpen=!state.navOpen; render(); }
+  else if(a==="closeNav"){ state.navOpen=false; render(); }
+  else if(a==="setMode"){ state.mode=el.getAttribute("data-mode"); state.navOpen=false; render(); scrollTop(); }
+  else if(a==="goTopic"){ state.activeId=el.getAttribute("data-id"); state.mode="study"; state.navOpen=false; render(); scrollTop(); }
+  else if(a==="toggleReviewed"){
+    var id=el.getAttribute("data-id");
+    if(state.reviewed.has(id)) state.reviewed.delete(id); else state.reviewed.add(id);
+    saveReviewed(state.reviewed); render();
+  }
+  else if(a==="toggleDrill"){
+    var drill = el.closest(".drill");
+    if(drill){ drill.classList.toggle("open"); var c=drill.querySelector(".drill-caret"); if(c) c.textContent = drill.classList.contains("open")?"\u2212":"+"; }
+  }
+  else if(a==="drillFilter"){ state.drillFilter=el.getAttribute("data-f"); state.drillIndex=0; state.flipped=false; render(); }
+  else if(a==="drillFlip"){ state.flipped=!state.flipped; render(); }
+  else if(a==="drillNav"){
+    var list = state.drillFilter==="all" ? ALL_DRILLS : ALL_DRILLS.filter(function(d){return d.sectionId===state.drillFilter;});
+    var dir=parseInt(el.getAttribute("data-dir"),10);
+    state.drillIndex=(state.drillIndex+dir+list.length)%list.length; state.flipped=false; render();
+  }
+  else if(a==="copy"){ copyText(decodeURIComponent(el.getAttribute("data-src")), el); }
+});
+
+function scrollTop(){ var c=document.getElementById("content"); if(c) c.scrollTop=0; }
+
+document.addEventListener("keydown", function(e){
+  if(state.mode!=="drill") return;
+  var tag = (e.target.tagName||"").toLowerCase();
+  if(tag==="input"||tag==="textarea") return;
+  if(e.key==="ArrowRight"){ var n=document.querySelector('[data-action="drillNav"][data-dir="1"]'); if(n) n.click(); }
+  else if(e.key==="ArrowLeft"){ var p=document.querySelector('[data-action="drillNav"][data-dir="-1"]'); if(p) p.click(); }
+  else if(e.key===" "||e.key==="Enter"){ e.preventDefault(); state.flipped=!state.flipped; render(); }
+});
+
+render();
+</script>
+</body>
+</html>
