@@ -328,7 +328,7 @@ async def get_price(symbol: str):
     b = await search_web(query)      # ~500ms
     c = await search_memory(query)   # ~200ms
     return combine(a, b, c)          # total ~= 1000ms`,
-       a:"They're awaited sequentially, so the latencies add up. Since they don't depend on each other, run them concurrently with asyncio.gather — total time drops to the slowest call (~500ms). Results come back in argument order, so unpacking is safe.",
+       a:"The three calls are awaited sequentially, so the latencies add up. Since they don't depend on each other, run them concurrently with asyncio.gather — total time drops to the slowest call (~500ms). Results come back in argument order, so unpacking is safe.",
        acode:
 `import asyncio
 
@@ -342,13 +342,76 @@ async def gather_context(query: str):
       {q:"Coroutines vs threads vs processes — when do you reach for each?",
        a:"Coroutines (asyncio): one thread, cooperative, ideal for lots of concurrent I/O (API/DB calls) — exactly what an agent does. Threads: OS-scheduled, share memory, good for blocking I/O with sync libraries, but the Global Interpreter Lock (GIL) means no speedup for CPU work. Processes: separate memory, real multi-core parallelism, for CPU-bound work."}
     ]},
-  { id:"fastapi", name:"FastAPI + Pydantic", why:"The web framework for the role. Pydantic models are also how you define tool/function schemas for LLMs and how you parse structured output back.",
+  { id:"pydantic", name:"Pydantic", why:"Validation and serialization at the boundary — and how you define tool/function schemas for LLMs. It shows up in both the web layer and the agent layer, so interviewers lean on it.",
     points:[
-      "Pydantic BaseModel validates and coerces input and serializes output; FastAPI uses it for request/response bodies and auto-generates OpenAPI docs.",
-      "The same model shape is what you hand an LLM as a tool schema (model_json_schema()) and what you parse tool-call arguments back into (model_validate_json).",
-      "Depends() injects shared resources (DB session, current user), created per request and easy to override in tests.",
-      "Return status codes intentionally: 200 ok, 201 created, 202 accepted (async job queued), 422 validation (automatic).",
-      "BackgroundTasks for light in-process fire-and-forget work; Celery/queue for heavy, retryable, cross-process jobs."
+      "BaseModel validates and coerces input and serializes output. It's the standard way to model data crossing a trust boundary: request bodies, config, and LLM output.",
+      "Declare fields with types plus constraints via Field(...) (min/max length, numeric ranges, regex). Invalid data raises a clear ValidationError right at the edge.",
+      "model_json_schema() emits a JSON schema for the model — exactly what you hand an LLM as a tool/function definition.",
+      "model_validate_json() parses AND validates untrusted JSON (API input, an LLM's tool-call arguments) into a typed object, so malformed output raises instead of leaking through.",
+      "Coercion is on by default ('7' -> 7 where sensible); reach for strict types when you don't want that."
+    ],
+    code:[
+      {file:"pydantic_basics.py", src:
+`from typing import Literal
+from pydantic import BaseModel, Field, ValidationError
+
+class ChatRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=4000)
+    temperature: float = Field(0.7, ge=0, le=2)   # validated range
+
+try:
+    ChatRequest(prompt="", temperature=5)   # too short + out of range
+except ValidationError as e:
+    print(e)                                # clear, field-level errors
+
+# the SAME model powers an LLM tool definition:
+class GetWeather(BaseModel):
+    city: str
+    unit: Literal["celsius", "fahrenheit"] = "celsius"
+
+schema = GetWeather.model_json_schema()          # -> hand to the model
+args = GetWeather.model_validate_json(raw_json)  # <- parse it safely back`}
+    ],
+    drills:[
+      {q:"This request model lets bad data through to your handler. Add validation so an empty prompt or a temperature above 2 is rejected before the handler runs.",
+       code:
+`from pydantic import BaseModel
+
+class ChatRequest(BaseModel):
+    prompt: str
+    temperature: float`,
+       a:"Move the checks into the model with Field constraints, so validation happens at parse time rather than in your handler: Field(min_length=1) rejects an empty prompt and Field(ge=0, le=2) bounds temperature. FastAPI (or model_validate) then returns a clear 422 automatically instead of passing junk downstream.",
+       acode:
+`from pydantic import BaseModel, Field
+
+class ChatRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=4000)
+    temperature: float = Field(0.7, ge=0, le=2)`},
+      {q:"The model returned this tool call as JSON. Spot the risk in parsing it into a plain dict, and show the safer approach.",
+       code:
+`# the model emitted this for a tool call:
+raw = '{"city": "Dubai", "unit": "kelvin"}'
+args = json.loads(raw)                 # just a dict, no checks
+temp = get_weather(args["city"], args["unit"])   # 'kelvin'?!`,
+       a:"A dict trusts whatever the model emitted — missing keys, wrong types, or invalid values (unit='kelvin') flow straight into your function. Define the tool's arguments as a Pydantic model: it gives you (1) the JSON schema to send the model as the tool definition and (2) validation on the way back, so bad output raises instead of corrupting the call.",
+       acode:
+`from typing import Literal
+from pydantic import BaseModel
+
+class GetWeather(BaseModel):
+    city: str
+    unit: Literal["celsius", "fahrenheit"] = "celsius"
+
+args = GetWeather.model_validate_json(raw)   # raises on 'kelvin'
+temp = get_weather(args.city, args.unit)`}
+    ]},
+  { id:"fastapi", name:"FastAPI", why:"The web framework for the role. Expect to write an async endpoint, inject dependencies, and pick the right status code.",
+    points:[
+      "Endpoints are async functions; request and response bodies are Pydantic models, so you get validation and auto-generated OpenAPI docs for free.",
+      "Depends() injects shared resources (DB session, auth, an HTTP/LLM client) per request — and it's trivial to override in tests.",
+      "Choose status codes intentionally: 200 ok, 201 created, 202 accepted (work queued, result not ready yet), 422 validation (automatic from Pydantic).",
+      "BackgroundTasks for light in-process fire-and-forget work; hand heavy, retryable, cross-process jobs to a queue (Celery).",
+      "Middleware and exception handlers cover cross-cutting concerns: request logging, auth, and turning exceptions into clean error responses."
     ],
     code:[
       {file:"app.py", src:
@@ -393,25 +456,10 @@ async def create_report(req: ReportRequest):
 async def create_report(req: ReportRequest):
     job_id = build_report.delay(req.model_dump()).id   # Celery task
     return {"status": "queued", "job_id": job_id}`},
-      {q:"The model returned this tool call as JSON. Spot the risk in parsing it into a plain dict, and show the safer approach.",
-       code:
-`# the model emitted this for a tool call:
-raw = '{"city": "Dubai", "unit": "kelvin"}'
-args = json.loads(raw)                 # just a dict, no checks
-temp = get_weather(args["city"], args["unit"])   # 'kelvin'?!`,
-       a:"A dict trusts whatever the model emitted — missing keys, wrong types, or invalid values (unit='kelvin') flow straight into your function. Define the tool's arguments as a Pydantic model: it gives you (1) the JSON schema to send the model as the tool definition and (2) validation on the way back, so bad output raises instead of corrupting the call.",
-       acode:
-`from typing import Literal
-from pydantic import BaseModel
-
-class GetWeather(BaseModel):
-    city: str
-    unit: Literal["celsius", "fahrenheit"] = "celsius"
-
-args = GetWeather.model_validate_json(raw)   # raises on 'kelvin'
-temp = get_weather(args.city, args.unit)`}
+      {q:"Why put the DB session (or LLM client) behind Depends() instead of creating it inside each endpoint?",
+       a:"Depends() builds it per request and guarantees cleanup via the dependency's try/finally, keeps handlers free of setup boilerplate, and — the big one — lets tests swap in a fake or a test database by overriding the dependency in one line. Creating it inline couples every handler to setup/teardown and makes mocking painful."}
     ]},
-  { id:"decorators", name:"Decorators", why:"The classic 'do you really know Python' test. They'll ask you to write a timing or retry decorator live.",
+  { id:"decorators", name:"Decorators", why:"The classic 'do you really know Python' test. Interviewers love making you write a timing or retry decorator live.",
     points:[
       "A decorator is a callable that takes a function and returns a (usually wrapping) function.",
       "@functools.wraps preserves the wrapped function's name, docstring, and signature metadata.",
@@ -1215,13 +1263,13 @@ seen = {u.id for u in users}         # set: O(1) membership`}
     ]}
 ]},
 
-{ id:"meta", label:"How they test", sub:"Format & what to rehearse", color:"#F78C6C", topics:[
-  { id:"format", name:"The interview format", why:"Senior technical interviews for this kind of role rarely lean on algorithm puzzles. Knowing the shape of the questions lets you rehearse the exact right things.",
+{ id:"meta", label:"How interviewers test", sub:"Format & what to rehearse", color:"#F78C6C", topics:[
+  { id:"format", name:"The interview format", why:"AI interviews rarely lean on algorithm puzzles. Knowing the shape of the questions lets you rehearse the exact right things.",
     points:[
       "Expect practical prompts, not algorithm puzzles: 'write a retry decorator', 'here's an async endpoint calling a blocking function, what's wrong', 'sketch the agent tool-calling loop', or 'review this snippet for bugs'.",
       "Rehearse until automatic — the async blocking trap, the retry decorator, the agent loop, and a transaction commit/rollback.",
       "You do NOT need pandas/numpy/PyTorch — this is platform engineering, not data science.",
-      "Two things to build from scratch beforehand: a small FastAPI app with one async endpoint, and the agent loop (plus a Celery task with a retry). That covers ~70% of what they can throw at you."
+      "Two things to build from scratch beforehand: a small FastAPI app with one async endpoint, and the agent loop (plus a Celery task with a retry). That covers ~70% of what an interviewer can throw at you."
     ],
     code:[
       {file:"rehearse.md", src:
@@ -1388,7 +1436,7 @@ function drillHTML(){
   var card = list[state.drillIndex];
 
   var out = '<div class="drillmode"><div class="drill-head"><h1 class="topic-title">Drill deck</h1>'
-    + '<p class="drill-intro">Read the question and the code, answer out loud, then flip for the fix. These are the exact shapes they will throw at you.</p>'
+    + '<p class="drill-intro">Read the question and the code, answer out loud, then flip for the fix. These are the exact shapes an interviewer will throw at you.</p>'
     + '<div class="drill-filters">';
   filters.forEach(function(f){
     var on = state.drillFilter===f.id;
